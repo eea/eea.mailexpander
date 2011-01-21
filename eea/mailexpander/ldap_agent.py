@@ -42,17 +42,20 @@ class LdapAgent(object):
         return 'uid=' + user_id + ',' + self._user_dn_suffix
 
     def get_role(self, role_id):
-        """
-        Returns a dictionary describing the role `role_id`.
+        """ Returns a dictionary describing the role `role_id`.
         Also return all the members and their emails
+
         """
 
         query_dn = self._role_dn(role_id)
         result = self.conn.search_s(query_dn, ldap.SCOPE_BASE)
 
-        assert len(result) == 1
-        dn, attr = result[0]
-        assert dn == query_dn
+        try:
+            assert len(result) == 1
+            dn, attr = result[0]
+            assert dn == query_dn
+        except AssertionError:
+            raise ValueError
 
         attr['members_data'] = {}
         if 'uniqueMember' in attr:

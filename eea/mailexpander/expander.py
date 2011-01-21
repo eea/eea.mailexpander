@@ -55,10 +55,13 @@ class Expander(object):
             try:
                 role_data = self.agent.get_role(role)
             except ldap.SERVER_DOWN:
-                log.error("LDAP server is down")
+                log.exception("LDAP server is down")
                 return RETURN_CODES['EX_TEMPFAIL']
-            except (ldap.NO_SUCH_OBJECT, AssertionError):
+            except (ldap.NO_SUCH_OBJECT, ValueError):
                 log.error("%r role not found in ldap", role)
+                return RETURN_CODES['EX_NOUSER']
+            except:
+                log.exception("%r role not found exception", role)
                 return RETURN_CODES['EX_NOUSER']
 
             #Check if from_email can expand
@@ -68,20 +71,17 @@ class Expander(object):
             #Split the emails in to batches
             email_batches = [[]]
             batch = 0
-            limit = 50 #Send 50 emails batches
+            batch_size = 50 #Send 50 emails batches
 
             for dn, data in role_data['members_data'].iteritems():
-                if len(email_batches[batch]) >= limit:
+                if len(email_batches[batch]) >= batch_size:
                     batch += 1
+                    email_batches.append([]) #Init new batch
                 email_batches[batch].extend(data['mail'])
 
             #connect to sendmail and send the emails
             for emails in email_batches:
-                try:
-                    self.smtp.sendmail(from_email, emails, content)
-                except: #On failure try again after 5 seconds
-                    time.sleep(5)
-                    self.smtp.sendmail(from_email, emails, content)
+                self.smtp.sendmail(from_email, emails, content)
                 log.info("Sent emails to %r", emails)
             return RETURN_CODES['EX_OK']
 
@@ -100,6 +100,7 @@ class Expander(object):
                             - *@domain.com, admin.*@domain.com (fnmatch patters)
                             - alex@domain.com (simple email addresses)
         permittedPerson -- DN of a user (match the user's email with `from_email`)
+
         """
 
         if 'permittedSender' in role_data:
@@ -117,9 +118,9 @@ class Expander(object):
                                 return True
                 elif fnmatch(from_email, sender_pattern):
                     return True
-        elif 'permittedPerson' in role_data:
+        if 'permittedPerson' in role_data:
             for permitted_dn in role_data['permittedPerson']:
-                if from_email in self.self.agent._query(permitted_dn)['mail']:
+                if from_email in self.agent._query(permitted_dn)['mail']:
                     return True
         return False
 
@@ -147,27 +148,25 @@ def main():
     #Message body + headers come from raw_input. Make sure they stay untouched
     content = ""
     while True:
-        try:
-            raw = raw_input()
-            if raw is None:
-                break
-            content += raw + "\r\n"
-        except EOFError:
+        buffer = sys.stdin.read()
+        if not buffer:
             break
+        content += buffer
 
     #Open connection with the ldap
     try:
         agent = LdapAgent(ldap_server=ldap_server)
     except:
-        log.error("Cannot connect to LDAP %s", ldap_server)
+        log.exception("Cannot connect to LDAP %s", ldap_server)
         return RETURN_CODES['EX_TEMPFAIL']
 
     #Since this is the same mailer use localhost
     smtp = smtplib.SMTP('localhost')
-
-    expander = Expander(agent, smtp)
-    return_code = expander.expand(from_email, role_email, content)
-    smtp.quit()
+    try:
+        expander = Expander(agent, smtp)
+        return_code = expander.expand(from_email, role_email, content)
+    finally:
+        smtp.quit()
 
     return return_code
 
