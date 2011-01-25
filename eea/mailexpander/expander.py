@@ -152,30 +152,34 @@ def main():
         log.setLevel(logging.INFO)
         log.addHandler(logfile_handler)
 
-    #Message body + headers come from raw_input. Make sure they stay untouched
-    content = ""
-    while True:
-        buffer = sys.stdin.read()
-        if not buffer:
-            break
-        content += buffer
-
-    #Open connection with the ldap
     try:
-        agent = LdapAgent(ldap_server=ldap_server)
+        #Message body + headers come from raw_input. Make sure they stay untouched
+        content = ""
+        while True:
+            buffer = sys.stdin.read()
+            if not buffer:
+                break
+            content += buffer
+
+        #Open connection with the ldap
+        try:
+            agent = LdapAgent(ldap_server=ldap_server)
+        except:
+            log.exception("Cannot connect to LDAP %s", ldap_server)
+            return RETURN_CODES['EX_TEMPFAIL']
+
+        #Since this is the same mailer use localhost
+        smtp = smtplib.SMTP('localhost')
+        try:
+            expander = Expander(agent, smtp)
+            return_code = expander.expand(from_email, role_email, content)
+        finally:
+            smtp.quit()
+
+        return return_code
     except:
-        log.exception("Cannot connect to LDAP %s", ldap_server)
-        return RETURN_CODES['EX_TEMPFAIL']
-
-    #Since this is the same mailer use localhost
-    smtp = smtplib.SMTP('localhost')
-    try:
-        expander = Expander(agent, smtp)
-        return_code = expander.expand(from_email, role_email, content)
-    finally:
-        smtp.quit()
-
-    return return_code
+        log.exception("Unexpected error")
+        return RETURN_CODES['EX_SOFTWARE']
 
 if __name__ == '__main__':
     sys.exit(main())
