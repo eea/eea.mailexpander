@@ -125,7 +125,7 @@ class Expander(object):
         return False
 
 def usage():
-    print "%s -r [from-email] -f [to-email] -l [ldap-host]"
+    print "%s -r [from-email] -f [to-email] -l [ldap-host] -o [logfile]"
     log.error("Invalid arguments %r", sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
 
@@ -133,17 +133,24 @@ def main():
     log.info("=========== starting rolesmailer ============")
 
     try: #Handle cmd arguments
-        opts, args = getopt.getopt(sys.argv[1:], "r:f:l:")
+        opts, args = getopt.getopt(sys.argv[1:], "r:f:l:o:")
     except getopt.GetoptError, err:
         usage()
 
+    logfile = None
     try:
         opts = dict(opts)
         from_email = opts['-f']
         role_email = opts['-r']
         ldap_server = opts['-l']
+        logfile = opts.get('-o')
     except KeyError:
         usage()
+
+    if logfile is not None:
+        logfile_handler = logging.FileHandler(logfile, 'w')
+        log.setLevel(logging.INFO)
+        log.addHandler(logfile_handler)
 
     #Message body + headers come from raw_input. Make sure they stay untouched
     content = ""
