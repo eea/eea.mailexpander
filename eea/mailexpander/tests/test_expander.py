@@ -161,6 +161,11 @@ class ExpanderTest(unittest.TestCase):
         return_code = expander.expand('user_four@example.com',
                                       role_email, body_fixture)
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+        #PermitedPerson with CamelCase - email addresses are case insensitve
+        return_code = expander.expand('User_Four@example.com',
+                                      role_email, body_fixture)
+        self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+
 
     def test_ldap(self):
         """ Test ldap errors """
