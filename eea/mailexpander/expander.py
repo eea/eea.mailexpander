@@ -31,6 +31,7 @@ RETURN_CODES = {
    'EX_CONFIG':       78, # configuration error
 }
 
+sys.tracebacklimit = 0
 log = logging.getLogger('MAILEXPANDER')
 log.setLevel(logging.INFO)
 stream_handler = logging.StreamHandler()
@@ -56,13 +57,13 @@ class Expander(object):
             try:
                 role_data = self.agent.get_role(role)
             except ldap.SERVER_DOWN:
-                log.exception("LDAP server is down")
+                log.error("LDAP server is down")
                 return RETURN_CODES['EX_TEMPFAIL']
             except (ldap.NO_SUCH_OBJECT, ValueError):
-                log.error("%r role not found in ldap", role)
+                log.info("%r role not found in ldap", role)
                 return RETURN_CODES['EX_NOUSER']
             except:
-                log.exception("%r role not found exception", role)
+                log.error("%r role not found exception", role)
                 return RETURN_CODES['EX_NOUSER']
 
             #Check if from_email can expand
@@ -102,7 +103,7 @@ class Expander(object):
             return RETURN_CODES['EX_OK']
 
         except:
-            log.exception("Internal error")
+            log.error("Internal error")
             return RETURN_CODES['EX_SOFTWARE']
 
     def can_expand(self, from_email, role_data):
@@ -182,7 +183,7 @@ def main():
         try:
             agent = LdapAgent(ldap_server=ldap_server)
         except:
-            log.exception("Cannot connect to LDAP %s", ldap_server)
+            log.error("Cannot connect to LDAP %s", ldap_server)
             return RETURN_CODES['EX_TEMPFAIL']
 
         #Since this is the same mailer use localhost
@@ -195,7 +196,7 @@ def main():
 
         return return_code
     except:
-        log.exception("Unexpected error")
+        log.error("Unexpected error")
         return RETURN_CODES['EX_SOFTWARE']
 
 if __name__ == '__main__':

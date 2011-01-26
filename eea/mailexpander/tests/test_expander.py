@@ -13,7 +13,7 @@ from mock import Mock, patch, wraps
 from eea.mailexpander.expander import Expander, RETURN_CODES, log
 from test_ldap_agent import StubbedLdapAgent
 
-log.setLevel(logging.INFO)
+log.setLevel(logging.CRITICAL)
 
 with open(os.path.join(os.path.dirname(__file__), 'mail_content.txt')) as f:
     body_fixture = f.read()
@@ -231,3 +231,7 @@ class ExpanderTest(unittest.TestCase):
                                       'test@roles.eionet.europa.eu',
                                       body_fixture)
         self.assertEqual(total_mails, 120)
+
+if __name__ == '__main__':
+    unittest.main()
+
