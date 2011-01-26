@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import email
 import getopt
 import ldap
 import logging
@@ -31,9 +32,9 @@ RETURN_CODES = {
 }
 
 log = logging.getLogger('MAILEXPANDER')
-log.setLevel(logging.ERROR)
-handler = logging.StreamHandler()
-log.addHandler(handler)
+log.setLevel(logging.INFO)
+stream_handler = logging.StreamHandler()
+log.addHandler(stream_handler)
 
 class Expander(object):
     """ """
@@ -79,6 +80,21 @@ class Expander(object):
                     email_batches.append([]) #Init new batch
                 email_batches[batch].extend(data['mail'])
 
+            #Add the necessary headers such as Recieved and modify the subject
+            #with [role]
+            em = email.message_from_string(content)
+            #Prepend to subject:
+            em.replace_header('subject', "[%s] %s"  % (role,
+                                                       em.get('subject')))
+            #Add a Recieved: header
+            if em.get('received'):
+                em.add_header('Received', em.get('received'))
+
+            #Add Resent-From: header
+            if role_email not in em.get_all('Resent-From', []):
+                em.add_header('Resent-From', role_email)
+
+            content = em.as_string()
             #connect to sendmail and send the emails
             for emails in email_batches:
                 self.smtp.sendmail(from_email, emails, content)
@@ -151,6 +167,7 @@ def main():
         logfile_handler = logging.FileHandler(logfile, 'w')
         log.setLevel(logging.INFO)
         log.addHandler(logfile_handler)
+        log.removeHandler(stream_handler)
 
     try:
         #Message body + headers come from raw_input. Make sure they stay untouched
@@ -182,4 +199,5 @@ def main():
         return RETURN_CODES['EX_SOFTWARE']
 
 if __name__ == '__main__':
+    log.removeHandler(stream_handler)
     sys.exit(main())

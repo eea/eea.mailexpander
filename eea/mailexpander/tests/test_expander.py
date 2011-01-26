@@ -1,8 +1,12 @@
-import os
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import email
 import ldap
+import logging
+import os
 import smtplib
 import unittest
-import logging
 from copy import deepcopy
 from mock import Mock, patch, wraps
 
@@ -87,8 +91,19 @@ class ExpanderTest(unittest.TestCase):
         expander = Expander(self.agent, smtp_mock)
         expander.can_expand = Mock(return_value=True)
         return_code = expander.expand(from_email, role_email, body_fixture)
+
+        new_body_fixture = smtp_mock.sendmail.call_args[0][2]
         smtp_mock.sendmail.assert_called_once_with(from_email, dest_emails,
-                                                   body_fixture)
+                                                   new_body_fixture)
+
+        #Check the modified headers
+        em = email.message_from_string(new_body_fixture)
+        self.assertEqual(len(em.get_all('received')), 2)
+        self.assertEqual(len(em.get_all('resent-from')), 1)
+        self.assertEqual(em.get('resent-from'), role_email)
+        self.assertTrue(em.get('subject').startswith('[%s]' %
+                                                     role_email.split('@')[0]))
+
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
     def test_send_failure(self):
@@ -109,8 +124,8 @@ class ExpanderTest(unittest.TestCase):
 
         smtp_mock = Mock()
         def smtp_sendmail_called(from_email, emails, content):
+            """ Content is modified but this is not the subject of this test"""
             assert emails == ['user_two@example.com', 'user_one@example.com']
-            assert content == body_fixture
 
         smtp_mock.sendmail.side_effect = smtp_sendmail_called
 
