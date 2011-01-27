@@ -1,0 +1,46 @@
+Received: from sasha-eau.edw.ro (localhost.localdomain [127.0.0.1])
+	by sasha-eau.edw.ro (8.14.3/8.14.3/Debian-9.1ubuntu1) with ESMTP id
+	p0RDKkQu026800
+	for <testing@roles.eionet.europa.eu>; Thu, 27 Jan 2011 15:20:46 +0200
+Received: (from alex@localhost)
+	by sasha-eau.edw.ro (8.14.3/8.14.3/Submit) id p0RDKkIc026799
+	for testing@roles.eionet.europa.eu; Thu, 27 Jan 2011 15:20:46 +0200
+X-Authentication-Warning: sasha-eau.edw.ro: alex set sender to
+	alexandru.plugaru@eaudeweb.ro using -f
+Subject: [testing] aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+From: Alexandru Plugaru <alexandru.plugaru@eaudeweb.ro>
+Reply-To: alexandru.plugaru@eaudeweb.ro
+To: testing@roles.eionet.europa.eu
+Content-Type: multipart/alternative; boundary="=-oZtur1BZtcxw3c5wOjLA"
+Organization: Eau de web
+Date: Thu, 27 Jan 2011 15:20:46 +0200
+Message-ID: <1296134446.26481.1.camel@sasha-eau>
+Mime-Version: 1.0
+X-Mailer: Evolution 2.28.3
+Received: from sasha-eau.edw.ro (localhost.localdomain [127.0.0.1])
+	by sasha-eau.edw.ro (8.14.3/8.14.3/Debian-9.1ubuntu1) with ESMTP id
+	p0RDKkQu026800
+	for <testing@roles.eionet.europa.eu>; Thu, 27 Jan 2011 15:20:46 +0200
+
+--=-oZtur1BZtcxw3c5wOjLA
+Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+--=-oZtur1BZtcxw3c5wOjLA
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 TRANSITIONAL//EN">
+<HTML>
+<HEAD>
+  <META HTTP-EQUIV=3D"Content-Type" CONTENT=3D"text/html; CHARSET=3DUTF-8">
+  <META NAME=3D"GENERATOR" CONTENT=3D"GtkHTML/3.28.3">
+</HEAD>
+<BODY>
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+</BODY>
+</HTML>
+
+--=-oZtur1BZtcxw3c5wOjLA--

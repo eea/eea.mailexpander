@@ -8,6 +8,7 @@ import os
 import smtplib
 import unittest
 from copy import deepcopy
+from email.iterators import body_line_iterator
 from mock import Mock, patch, wraps
 
 from eea.mailexpander.expander import Expander, RETURN_CODES, log
@@ -15,14 +16,25 @@ from test_ldap_agent import StubbedLdapAgent
 
 log.setLevel(logging.CRITICAL)
 
-with open(os.path.join(os.path.dirname(__file__), 'mail_content.txt')) as f:
-    body_fixture = f.read()
-
 class ExpanderTest(unittest.TestCase):
     def setUp(self):
         self.smtp = Mock()
         self.agent = StubbedLdapAgent(ldap_server='')
         self.mock_conn = self.agent.conn
+
+        #Load fixtures from ./fixtures directory into dictionary with keys as
+        #filenames without extentions
+        self.fixtures = {}
+        fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
+        fixture_paths = os.listdir(fixtures_dir)
+        for fixture_filename in fixture_paths:
+            fixture_path = os.path.join(fixtures_dir, fixture_filename)
+            if os.path.isfile(fixture_path):
+                content = None
+                with open(fixture_path, 'rb') as f:
+                    content = f.read()
+                    f.close()
+                self.fixtures[os.path.splitext(fixture_filename)[0]] = content
 
         role_dn = self.agent._role_dn
         user_dn = self.agent._user_dn
@@ -81,7 +93,11 @@ class ExpanderTest(unittest.TestCase):
         self.mock_conn.search_s.side_effect = ldap_search_called
 
     def test_send(self):
-        """ Test basic sending with sendmail """
+        """ Test successful sending of the e-mails (7bit, 8bit, base64, binary)
+        After the modifications of the headers during the expantion
+        the content itself should remain unmodified.
+
+        """
         from_email = 'user_one@example.com'
         role_email = 'test@roles.eionet.europa.eu'
         dest_emails = ['user_two@example.com', 'user_one@example.com']
@@ -90,24 +106,47 @@ class ExpanderTest(unittest.TestCase):
 
         expander = Expander(self.agent, smtp_mock)
         expander.can_expand = Mock(return_value=True)
-        return_code = expander.expand(from_email, role_email, body_fixture)
 
-        new_body_fixture = smtp_mock.sendmail.call_args[0][2]
-        smtp_mock.sendmail.assert_called_once_with(from_email, dest_emails,
-                                                   new_body_fixture)
+        for fixture_name, fixture_content in self.fixtures.iteritems():
+            return_code = expander.expand(from_email, role_email,
+                                          self.fixtures[fixture_name])
+            self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
-        #Check the modified headers
-        em = email.message_from_string(new_body_fixture)
-        self.assertEqual(len(em.get_all('received')), 2)
-        self.assertEqual(len(em.get_all('resent-from')), 1)
-        self.assertEqual(em.get('resent-from'), role_email)
-        self.assertTrue(em.get('subject').startswith('[%s]' %
-                                                     role_email.split('@')[0]))
+            new_body = smtp_mock.sendmail.call_args[0][2]
 
-        self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+            em = email.message_from_string(new_body)
+            assert len(em.get_all('received')) >= 2
+            self.assertEqual(len(em.get_all('sender')), 1)
+            self.assertEqual(em.get('sender'), role_email)
+            self.assertTrue(em.get('subject').startswith('[%s]' %
+                                                         role_email.split('@')[0]))
 
-    def test_send_failure(self):
-        """ Some failure tests """
+            ignore_headers = ('Received', 'Sender', 'Subject', ) #Checked above
+            #Check the rest of the message, make sure they stay the same
+            old_em = email.message_from_string(
+                        email.message_from_string(fixture_content).as_string())
+
+            for header, value in em.items():
+                if header not in ignore_headers:
+                    self.assertEquals(value, old_em.get(header))
+
+            #Based on boundary make sure the message body is untouched
+            boundary = em.get_boundary()
+            old_body = old_em.as_string().rpartition(boundary)[0].\
+                                partition(boundary)[2].partition(boundary)[2]
+            new_body = em.as_string().rpartition(boundary)[0].\
+                                partition(boundary)[2].partition(boundary)[2]
+            self.assertEquals(old_body, new_body)
+
+    def test_send_utf8(self):
+        """ Test unicode sender names and subjects """
+
+    def test_invalid_ldap_entries(self):
+        """ Test a few invalid LDAP entries such as user and role DN's"""
+        pass
+
+    def test_smtp_failure(self):
+        """ SMTP Failure test """
         from_email = 'user_one@example.com'
         role_email = 'test@roles.eionet.europa.eu'
 
@@ -116,11 +155,15 @@ class ExpanderTest(unittest.TestCase):
             side_effect=smtplib.SMTPException)
 
         expander = Expander(self.agent, smtp_mock)
-        return_code = expander.expand(from_email, role_email, body_fixture)
+        return_code = expander.expand(from_email, role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_SOFTWARE'])
 
     def test_can_expand(self):
-        """ Check if the user can expand """
+        """ Check if the user can expand, test with invalid
+        ldap entries
+
+        """
 
         smtp_mock = Mock()
         def smtp_sendmail_called(from_email, emails, content):
@@ -134,32 +177,36 @@ class ExpanderTest(unittest.TestCase):
         role_email = 'test@roles.eionet.europa.eu'
 
         return_code = expander.expand('alexandru.plugaru@eaudeweb.ro',
-                                      role_email, body_fixture)
+                                      role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #Should work see permittedSender: *@eaudeweb.ro
         return_code = expander.expand('someone@eaudeweb.ro',
-                                      role_email, body_fixture)
+                                      role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #Should fail - no such user
         return_code = expander.expand('someone@yyyy.ro', role_email,
-                                      body_fixture)
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOPERM'])
 
         #Owner can send
         return_code = expander.expand('user_three@example.com', role_email,
-                                      body_fixture)
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #Member can send
         return_code = expander.expand('user_one@example.com',
-                                      role_email, body_fixture)
+                                      role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #PermitedPerson
         return_code = expander.expand('user_four@example.com',
-                                      role_email, body_fixture)
+                                      role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
         #PermitedPerson with CamelCase - email addresses are case insensitve
         return_code = expander.expand('User_Four@example.com',
@@ -175,18 +222,21 @@ class ExpanderTest(unittest.TestCase):
         role_email = 'test12@roles.eionet.europa.eu'
 
         #Should fail.. no such role
-        return_code = expander.expand(from_email, role_email, body_fixture)
+        return_code = expander.expand(from_email, role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
 
         #Ldap server is down
         self.agent.get_role = Mock(side_effect=ldap.SERVER_DOWN)
-        return_code = expander.expand(from_email, role_email, body_fixture)
+        return_code = expander.expand(from_email, role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_TEMPFAIL'])
 
         #Other error
         self.agent.get_role = Mock(side_effect=TypeError)
-        return_code = expander.expand(from_email, role_email, body_fixture)
+        return_code = expander.expand(from_email, role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
     def test_batch(self):
@@ -234,7 +284,7 @@ class ExpanderTest(unittest.TestCase):
         expander = Expander(self.agent, smtp_mock)
         return_code = expander.expand('user_one@example.com',
                                       'test@roles.eionet.europa.eu',
-                                      body_fixture)
+                                      self.fixtures['content_7bit'])
         self.assertEqual(total_mails, 120)
 
 if __name__ == '__main__':

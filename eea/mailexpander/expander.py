@@ -85,17 +85,21 @@ class Expander(object):
             #with [role]
             em = email.message_from_string(content)
             #Prepend to subject:
-            em.replace_header('subject', "[%s] %s"  % (role,
-                                                       em.get('subject')))
+            subject = em.get('subject')
+            if ("[%s] " % role) in subject:
+                subject = subject.replace(("[%s]" % role), '')
+            em.replace_header('subject', "[%s] %s"  % (role, subject))
+
             #Add a Recieved: header
             if em.get('received'):
                 em.add_header('Received', em.get('received'))
 
-            #Add Resent-From: header
-            if role_email not in em.get_all('Resent-From', []):
-                em.add_header('Resent-From', role_email)
+            #Add Sender: header
+            if role_email not in em.get_all('sender', []):
+                em.add_header('Sender', role_email)
 
             content = em.as_string()
+
             #connect to sendmail and send the emails
             for emails in email_batches:
                 self.smtp.sendmail(from_email, emails, content)
@@ -125,7 +129,11 @@ class Expander(object):
                 if sender_pattern == 'owners':
                     if 'owner' in role_data:
                         for owner_dn in role_data['owner']:
-                            owner = self.agent._query(owner_dn)
+                            try:
+                                owner = self.agent._query(owner_dn)
+                            except ldap.INVALID_DN_SYNTAX:
+                                log.exception("Invalid DN: %s", owner_dn)
+                                continue
                             if from_email in owner['mail']:
                                 return True
                 elif sender_pattern == 'members':
@@ -137,8 +145,12 @@ class Expander(object):
                     return True
         if 'permittedPerson' in role_data:
             for permitted_dn in role_data['permittedPerson']:
-                if from_email in self.agent._query(permitted_dn)['mail']:
-                    return True
+                try:
+                    if from_email in self.agent._query(permitted_dn)['mail']:
+                        return True
+                except ldap.INVALID_DN_SYNTAX:
+                    log.exception("Invalid DN: %s", permitted_dn)
+                    continue
         return False
 
 def usage():
