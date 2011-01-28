@@ -51,7 +51,7 @@ class Expander(object):
         asynchronously """
 
         try:
-            role, domain = role_email.split('@')
+            role = role_email.split('@')[0]
             log.info("New mail from %s to %s", from_email, role_email)
 
             try:
@@ -167,9 +167,10 @@ class Expander(object):
         """ Use /usr/bin/sendmail or fallback to smtplib.
 
         """
-
         try:
-            ps = Popen(["sendmail"] + emails, stdin=PIPE)
+            #This should be secure check:
+            #http://docs.python.org/library/subprocess.html#using-the-subprocess-module
+            ps = Popen(["/usr/sbin/sendmail"] + emails, stdin=PIPE)
             ps.stdin.write(content)
             ps.stdin.flush()
             ps.stdin.close()
@@ -177,9 +178,10 @@ class Expander(object):
             return not ps.wait()
         except OSError: #fallback to smtplib
             #Since this is the same mailer use localhost
+            log.exception("Cannot use sendmail program. Falling back to "
+                          "smtplib.")
+            log.warning("If the smtp connection fails some emails will be lost")
             smtp = smtplib.SMTP('localhost')
-            log.warning("Falled back to smtplib. If an error occurs some "
-                        "e-mails can be dropped")
             try:
                 smtp.sendmail(from_email, emails, content)
                 log.info("Sent emails to %r", emails)
@@ -193,7 +195,8 @@ def usage():
     sys.exit(RETURN_CODES['EX_USAGE'])
 
 def main():
-    log.removeHandler(stream_handler) #Don't return log to output when in mailer
+    #Don't return log to output when in mailer
+    log.removeHandler(stream_handler)
 
     try: #Handle cmd arguments
         opts, args = getopt.getopt(sys.argv[1:], "r:f:l:o:")
@@ -211,7 +214,7 @@ def main():
         usage()
 
     if logfile is not None:
-        logfile_handler = logging.FileHandler(logfile, 'w')
+        logfile_handler = logging.FileHandler(logfile, 'a')
         log.setLevel(logging.INFO)
         log.addHandler(logfile_handler)
 
