@@ -4,6 +4,12 @@ import unittest
 
 from eea.mailexpander import ldap_agent
 
+def called_mock(dn, scope, calls_list):
+    expected_dn, expected_scope, ret = calls_list.pop(0)
+    assert dn == expected_dn
+    assert scope == expected_scope
+    return ret
+
 class StubbedLdapAgent(ldap_agent.LdapAgent):
     def connect(self, server):
         return Mock()
@@ -19,17 +25,8 @@ class LdapAgentTest(unittest.TestCase):
         role_dn = self.agent._role_dn
         user_dn = self.agent._user_dn
 
-        calls_list = []
-        def mock_called(dn, scope, **kwargs):
-            expected_dn, expected_scope, ret = calls_list.pop(0)
-            assert dn == expected_dn
-            assert scope == expected_scope
-            return ret
-
-        self.mock_conn.search_s.side_effect = mock_called
-
         # no local members
-        calls_list[:] = [
+        calls_list = [
             (role_dn('A'), ldap.SCOPE_BASE, [
                 (role_dn('A'), {
                     'uniqueMember': [ user_dn('userone'), user_dn('usertwo')],
@@ -56,6 +53,11 @@ class LdapAgentTest(unittest.TestCase):
             ])
         ]
 
+        def mock_called(dn, scope):
+            return called_mock(dn, scope, calls_list)
+
+        self.mock_conn.search_s.side_effect = mock_called
+
         role_data = self.agent.get_role('A')
         assert role_data['permittedSender'] == ['alexandru.plugaru@eaudeweb.ro',
                                            '*@eaudeweb.ro', 'members']
@@ -75,3 +77,66 @@ class LdapAgentTest(unittest.TestCase):
                 'telephoneNumber': ['5155 1234 2'],
                 'o': ['Testers Club 2'],
             }}
+
+    def test_missing_unique_member(self):
+        """ When an unique member is missing """
+
+        role_dn = self.agent._role_dn
+        user_dn = self.agent._user_dn
+
+        # Missing member usertwo
+        calls_list = [
+            (role_dn('A'), ldap.SCOPE_BASE, [
+                (role_dn('A'), {
+                    'uniqueMember': [ user_dn('userone'), user_dn('usertwo') ]
+                }),
+            ]),
+            (user_dn('userone'), ldap.SCOPE_BASE, [
+                (user_dn('userone'), {
+                    'cn': ['User one'],
+                    'mail': ['user_one@example.com'],
+                    'telephoneNumber': ['555 1234 2'],
+                    'o': ['Testers Club'],
+                }),
+            ]),
+        ]
+
+        def mock_called(dn, scope):
+            return called_mock(dn, scope, calls_list)
+        self.mock_conn.search_s.side_effect = mock_called
+
+        self.assertRaises(IndexError, self.agent.get_role, 'A')
+
+    def test_empty_member(self):
+        """ When an uniqueMember is empty """
+
+        role_dn = self.agent._role_dn
+        user_dn = self.agent._user_dn
+
+        # Empty uniqueMember
+        calls_list = [
+            (role_dn('A'), ldap.SCOPE_BASE, [
+                (role_dn('A'), {
+                    'uniqueMember': [ user_dn('userone'), '' ]
+                }),
+            ]),
+            (user_dn('userone'), ldap.SCOPE_BASE, [
+                (user_dn('userone'), {
+                    'cn': ['User one'],
+                    'mail': ['user_one@example.com'],
+                    'telephoneNumber': ['555 1234 2'],
+                    'o': ['Testers Club'],
+                }),
+            ]),
+        ]
+
+        def mock_called(dn, scope):
+            expected_dn, expected_scope, ret = calls_list.pop(0)
+            assert dn == expected_dn
+            assert scope == expected_scope
+            return ret
+        self.mock_conn.search_s.side_effect = mock_called
+        role_data = self.agent.get_role('A')
+        self.assertEquals(len(role_data['members_data']), 1)
+        self.assertEquals([user_dn('userone')],
+                    role_data['members_data'].keys())

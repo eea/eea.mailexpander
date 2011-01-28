@@ -16,6 +16,13 @@ from test_ldap_agent import StubbedLdapAgent
 
 log.setLevel(logging.CRITICAL)
 
+def ldap_search(dn, scope, ldap_data, **kwargs):
+    """ Used to return data from different ldap_data sources """
+    for l_dn, l_scope, data in ldap_data:
+        if (l_dn, l_scope) == (dn, scope):
+            return data
+    return []
+
 class ExpanderTest(unittest.TestCase):
     def setUp(self):
         self.smtp = Mock()
@@ -85,10 +92,7 @@ class ExpanderTest(unittest.TestCase):
         ]
 
         def ldap_search_called(dn, scope, **kwargs):
-            for l_dn, l_scope, data in self.ldap_data:
-                if (l_dn, l_scope) == (dn, scope):
-                    return data
-            return []
+            return ldap_search(dn, scope, self.ldap_data, **kwargs)
 
         self.mock_conn.search_s.side_effect = ldap_search_called
 
@@ -275,10 +279,7 @@ class ExpanderTest(unittest.TestCase):
         ldap_data[0][2][0][1]['uniqueMember'].extend(user_dns) #Adding members
 
         def ldap_search_called(dn, scope, **kwargs):
-            for l_dn, l_scope, data in ldap_data:
-                if (l_dn, l_scope) == (dn, scope):
-                    return data
-            return []
+            return ldap_search(dn, scope, ldap_data, **kwargs)
 
         self.mock_conn.search_s.side_effect = ldap_search_called
 
@@ -297,6 +298,44 @@ class ExpanderTest(unittest.TestCase):
                                       'test@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
         self.assertEqual(total_mails, 120)
+
+    def test_empty_role(self):
+        """ Test invalid role scenarios (missing members,
+        empty uniqueMember's)
+
+        """
+
+        #No members data
+        self.agent.get_role = Mock(return_value={'members_data': {},
+                                    'description': 'empty role'})
+        expander = Expander(self.agent, Mock())
+        return_code = expander.expand('test@email.com',
+                                      'test_empty@roles.eionet.europa.eu',
+                                      self.fixtures['content_7bit'])
+        self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
+
+        #No owner attribute - should fail
+        self.agent.get_role = Mock(return_value={
+            'description': 'no owner',
+            'members_data': {
+                'uid=userone,ou=Users,o=EIONET,l=Europe': {
+                    'cn': ['User one'],
+                    'mail': ['user_one@example.com'],
+                },
+                'uid=usertest1,ou=Users,o=EIONET,l=Europe': {
+                    'cn': ['User 1'],
+                    'mail': ['user.1@example.com'],
+                },
+            },
+            'uniqueMember': [
+                'uid=userone,ou=Users,o=EIONET,l=Europe',
+                'uid=usertwo,ou=Users,o=EIONET,l=Europe',
+            ],
+        })
+        return_code = expander.expand('test@email.com',
+                                      'test_empty@roles.eionet.europa.eu',
+                                      self.fixtures['content_7bit'])
+        self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
 if __name__ == '__main__':
     unittest.main()

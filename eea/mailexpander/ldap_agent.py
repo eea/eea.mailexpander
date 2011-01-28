@@ -58,7 +58,11 @@ class LdapAgent(object):
             raise ValueError
 
         attr['members_data'] = {}
+
         if 'uniqueMember' in attr:
             for member_dn in attr['uniqueMember']:
+                if member_dn == '': #Ignore empty uniqueMember attributes
+                    continue
                 attr['members_data'][member_dn] = self._query(member_dn)
+
         return attr

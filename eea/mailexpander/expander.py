@@ -56,6 +56,13 @@ class Expander(object):
 
             try:
                 role_data = self.agent.get_role(role)
+                assert 'members_data' in role_data, (
+                    '`uniqueMember` attribute is missing')
+                assert 'owner' in role_data, (
+                    '`owner` attribute is missing')
+            except AssertionError:
+                log.exception("In %r role:" % role)
+                return RETURN_CODES['EX_NOUSER']
             except ldap.SERVER_DOWN:
                 log.error("LDAP server is down")
                 return RETURN_CODES['EX_TEMPFAIL']
