@@ -90,7 +90,7 @@ class Expander(object):
                 subject = subject.replace(("[%s]" % role), '')
             em.replace_header('subject', "[%s] %s"  % (role, subject))
 
-            #Add a Recieved: header
+            #Add a Received: header
             if em.get('received'):
                 em.add_header('Received', em.get('received'))
 
@@ -124,6 +124,9 @@ class Expander(object):
 
         """
 
+        #Convert to lower in case of mixed-case e-mail addresses
+        from_email = from_email.lower()
+
         if 'permittedSender' in role_data:
             for sender_pattern in role_data['permittedSender']:
                 if sender_pattern == 'owners':
@@ -134,19 +137,20 @@ class Expander(object):
                             except ldap.INVALID_DN_SYNTAX:
                                 log.exception("Invalid DN: %s", owner_dn)
                                 continue
-                            if from_email in owner['mail']:
+                            if from_email in map(str.lower, owner['mail']):
                                 return True
                 elif sender_pattern == 'members':
                     if 'members_data' in role_data:
                         for user_dn, user_attrs in role_data['members_data'].iteritems():
-                            if from_email in user_attrs['mail']:
+                            if from_email in map(str.lower, user_attrs['mail']):
                                 return True
                 elif fnmatch(from_email, sender_pattern):
                     return True
         if 'permittedPerson' in role_data:
             for permitted_dn in role_data['permittedPerson']:
                 try:
-                    if from_email in self.agent._query(permitted_dn)['mail']:
+                    persons_emails = self.agent._query(permitted_dn)['mail']
+                    if from_email in map(str.lower, persons_emails):
                         return True
                 except ldap.INVALID_DN_SYNTAX:
                     log.exception("Invalid DN: %s", permitted_dn)

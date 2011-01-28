@@ -44,8 +44,8 @@ class ExpanderTest(unittest.TestCase):
                 [role_dn('test'), {
                     'uniqueMember': [ user_dn('userone'), user_dn('usertwo'),],
                     'permittedPerson': [ user_dn('user4') ],
-                    'permittedSender': ['alexandru.plugaru@eaudeweb.ro',
-                                        '*@eaudeweb.ro', 'members', 'owners'],
+                    'permittedSender': ['test@email.com',
+                                        '*@email.com', 'members', 'owners'],
                     'owner': [ user_dn('user3') ]
                 }],
             ]),
@@ -138,9 +138,6 @@ class ExpanderTest(unittest.TestCase):
                                 partition(boundary)[2].partition(boundary)[2]
             self.assertEquals(old_body, new_body)
 
-    def test_send_utf8(self):
-        """ Test unicode sender names and subjects """
-
     def test_invalid_ldap_entries(self):
         """ Test a few invalid LDAP entries such as user and role DN's"""
         pass
@@ -176,13 +173,13 @@ class ExpanderTest(unittest.TestCase):
 
         role_email = 'test@roles.eionet.europa.eu'
 
-        return_code = expander.expand('alexandru.plugaru@eaudeweb.ro',
+        return_code = expander.expand('test@email.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
-        #Should work see permittedSender: *@eaudeweb.ro
-        return_code = expander.expand('someone@eaudeweb.ro',
+        #Should work see permittedSender: *@email.com
+        return_code = expander.expand('someone@email.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
@@ -208,10 +205,24 @@ class ExpanderTest(unittest.TestCase):
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+
         #PermitedPerson with CamelCase - email addresses are case insensitve
         return_code = expander.expand('User_Four@example.com',
-                                      role_email, body_fixture)
+                                      role_email,
+                                      self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+
+        #*@email as destination
+        return_code = expander.expand('user_four@example.com',
+                                      '*@email.com',
+                                      self.fixtures['content_7bit'])
+        self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
+
+        #te*@email as destination
+        return_code = expander.expand('user_four@example.com',
+                                      'te*@email.com',
+                                      self.fixtures['content_7bit'])
+        self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
 
     def test_ldap(self):
@@ -289,4 +300,3 @@ class ExpanderTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
