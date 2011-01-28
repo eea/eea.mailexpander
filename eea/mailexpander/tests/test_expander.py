@@ -25,9 +25,11 @@ def ldap_search(dn, scope, ldap_data, **kwargs):
 
 class ExpanderTest(unittest.TestCase):
     def setUp(self):
-        self.smtp = Mock()
         self.agent = StubbedLdapAgent(ldap_server='')
         self.mock_conn = self.agent.conn
+
+        self.expander = Expander(self.agent)
+        self.expander.send_emails = Mock()
 
         #Load fixtures from ./fixtures directory into dictionary with keys as
         #filenames without extentions
@@ -106,17 +108,14 @@ class ExpanderTest(unittest.TestCase):
         role_email = 'test@roles.eionet.europa.eu'
         dest_emails = ['user_two@example.com', 'user_one@example.com']
 
-        smtp_mock = Mock()
-
-        expander = Expander(self.agent, smtp_mock)
-        expander.can_expand = Mock(return_value=True)
+        self.expander.can_expand = Mock(return_value=True)
 
         for fixture_name, fixture_content in self.fixtures.iteritems():
-            return_code = expander.expand(from_email, role_email,
+            return_code = self.expander.expand(from_email, role_email,
                                           self.fixtures[fixture_name])
             self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
-            new_body = smtp_mock.sendmail.call_args[0][2]
+            new_body = self.expander.send_emails.call_args[0][2]
 
             em = email.message_from_string(new_body)
             assert len(em.get_all('received')) >= 2
@@ -148,15 +147,10 @@ class ExpanderTest(unittest.TestCase):
 
     def test_smtp_failure(self):
         """ SMTP Failure test """
-        from_email = 'user_one@example.com'
-        role_email = 'test@roles.eionet.europa.eu'
 
-        smtp_mock = Mock()
-        smtp_mock.sendmail.side_effect = Mock(
-            side_effect=smtplib.SMTPException)
-
-        expander = Expander(self.agent, smtp_mock)
-        return_code = expander.expand(from_email, role_email,
+        self.expander.send_emails = Mock(side_effect=smtplib.SMTPException)
+        return_code = self.expander.expand('user_one@example.com',
+                                      'test@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_SOFTWARE'])
 
@@ -165,65 +159,59 @@ class ExpanderTest(unittest.TestCase):
         ldap entries
 
         """
-
-        smtp_mock = Mock()
-        def smtp_sendmail_called(from_email, emails, content):
+        def send_emails_called(from_email, emails, content):
             """ Content is modified but this is not the subject of this test"""
             assert emails == ['user_two@example.com', 'user_one@example.com']
-
-        smtp_mock.sendmail.side_effect = smtp_sendmail_called
-
-        expander = Expander(self.agent, smtp_mock)
+        self.expander.send_emails.side_effect = send_emails_called
 
         role_email = 'test@roles.eionet.europa.eu'
-
-        return_code = expander.expand('test@email.com',
+        return_code = self.expander.expand('test@email.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #Should work see permittedSender: *@email.com
-        return_code = expander.expand('someone@email.com',
+        return_code = self.expander.expand('someone@email.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #Should fail - no such user
-        return_code = expander.expand('someone@yyyy.ro', role_email,
+        return_code = self.expander.expand('someone@yyyy.ro', role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOPERM'])
 
         #Owner can send
-        return_code = expander.expand('user_three@example.com', role_email,
+        return_code = self.expander.expand('user_three@example.com', role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #Member can send
-        return_code = expander.expand('user_one@example.com',
+        return_code = self.expander.expand('user_one@example.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #PermitedPerson
-        return_code = expander.expand('user_four@example.com',
+        return_code = self.expander.expand('user_four@example.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #PermitedPerson with CamelCase - email addresses are case insensitve
-        return_code = expander.expand('User_Four@example.com',
+        return_code = self.expander.expand('User_Four@example.com',
                                       role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
         #*@email as destination
-        return_code = expander.expand('user_four@example.com',
+        return_code = self.expander.expand('user_four@example.com',
                                       '*@email.com',
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
         #te*@email as destination
-        return_code = expander.expand('user_four@example.com',
+        return_code = self.expander.expand('user_four@example.com',
                                       'te*@email.com',
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
@@ -232,25 +220,23 @@ class ExpanderTest(unittest.TestCase):
     def test_ldap(self):
         """ Test ldap errors """
 
-        expander = Expander(self.agent, self.smtp)
         from_email = 'user_one@example.com'
         role_email = 'test12@roles.eionet.europa.eu'
 
         #Should fail.. no such role
-        return_code = expander.expand(from_email, role_email,
+        return_code = self.expander.expand(from_email, role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
-
         #Ldap server is down
         self.agent.get_role = Mock(side_effect=ldap.SERVER_DOWN)
-        return_code = expander.expand(from_email, role_email,
+        return_code = self.expander.expand(from_email, role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_TEMPFAIL'])
 
         #Other error
         self.agent.get_role = Mock(side_effect=TypeError)
-        return_code = expander.expand(from_email, role_email,
+        return_code = self.expander.expand(from_email, role_email,
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
@@ -285,16 +271,13 @@ class ExpanderTest(unittest.TestCase):
 
         global total_mails
         total_mails = 0 #Count all emails
-        def smtp_sendmail_called(from_email, emails, content):
+        def send_emails_called(from_email, emails, content):
             assert len(emails) <= 50
             global total_mails
             total_mails += len(emails)
 
-        smtp_mock = Mock()
-        smtp_mock.sendmail.side_effect = smtp_sendmail_called
-
-        expander = Expander(self.agent, smtp_mock)
-        return_code = expander.expand('user_one@example.com',
+        self.expander.send_emails.side_effect = send_emails_called
+        return_code = self.expander.expand('user_one@example.com',
                                       'test@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
         self.assertEqual(total_mails, 120)
@@ -308,8 +291,8 @@ class ExpanderTest(unittest.TestCase):
         #No members data
         self.agent.get_role = Mock(return_value={'members_data': {},
                                     'description': 'empty role'})
-        expander = Expander(self.agent, Mock())
-        return_code = expander.expand('test@email.com',
+
+        return_code = self.expander.expand('test@email.com',
                                       'test_empty@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
@@ -332,7 +315,7 @@ class ExpanderTest(unittest.TestCase):
                 'uid=usertwo,ou=Users,o=EIONET,l=Europe',
             ],
         })
-        return_code = expander.expand('test@email.com',
+        return_code = self.expander.expand('test@email.com',
                                       'test_empty@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])

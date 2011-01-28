@@ -9,6 +9,7 @@ import smtplib
 import sys
 import time
 from fnmatch import fnmatch
+from subprocess import Popen, PIPE
 
 from ldap_agent import LdapAgent
 
@@ -39,9 +40,8 @@ log.addHandler(stream_handler)
 
 class Expander(object):
     """ """
-    def __init__(self, agent, smtp):
-        self.agent = agent
-        self.smtp = smtp
+    def __init__(self, ldap_agent):
+        self.agent = ldap_agent
 
     def expand(self, from_email, role_email, content):
         """ Get from-email and to-email (a ldap role) and the content.
@@ -77,17 +77,6 @@ class Expander(object):
             if self.can_expand(from_email, role_data) is False:
                 return RETURN_CODES['EX_NOPERM']
 
-            #Split the emails in to batches
-            email_batches = [[]]
-            batch = 0
-            batch_size = 50 #Send 50 emails batches
-
-            for dn, data in role_data['members_data'].iteritems():
-                if len(email_batches[batch]) >= batch_size:
-                    batch += 1
-                    email_batches.append([]) #Init new batch
-                email_batches[batch].extend(data['mail'])
-
             #Add the necessary headers such as Recieved and modify the subject
             #with [role]
             em = email.message_from_string(content)
@@ -107,14 +96,23 @@ class Expander(object):
 
             content = em.as_string()
 
-            #connect to sendmail and send the emails
-            for emails in email_batches:
-                self.smtp.sendmail(from_email, emails, content)
-                log.info("Sent emails to %r", emails)
-            return RETURN_CODES['EX_OK']
+            #Split the emails in to batches
+            email_batches = [[]]
+            batch = 0
+            batch_size = 50 #Send 50 emails batches
 
+            for dn, data in role_data['members_data'].iteritems():
+                if len(email_batches[batch]) >= batch_size:
+                    batch += 1
+                    email_batches.append([]) #Init new batch
+                email_batches[batch].extend(data['mail'])
+
+            #Send e-mails
+            for emails in email_batches:
+                self.send_emails(from_email, emails, content)
+            return RETURN_CODES['EX_OK']
         except:
-            log.error("Internal error")
+            log.exception("Internal error")
             return RETURN_CODES['EX_SOFTWARE']
 
     def can_expand(self, from_email, role_data):
@@ -142,7 +140,8 @@ class Expander(object):
                             try:
                                 owner = self.agent._query(owner_dn)
                             except ldap.INVALID_DN_SYNTAX:
-                                log.exception("Invalid DN: %s", owner_dn)
+                                log.exception("Invalid `owner` DN: %s",
+                                              owner_dn)
                                 continue
                             if from_email in map(str.lower, owner['mail']):
                                 return True
@@ -164,13 +163,37 @@ class Expander(object):
                     continue
         return False
 
+    def send_emails(self, from_email, emails, content):
+        """ Use /usr/bin/sendmail or fallback to smtplib.
+
+        """
+
+        try:
+            ps = Popen(["sendmail"] + emails, stdin=PIPE)
+            ps.stdin.write(content)
+            ps.stdin.flush()
+            ps.stdin.close()
+            log.info("Sent emails to %r", emails)
+            return not ps.wait()
+        except OSError: #fallback to smtplib
+            #Since this is the same mailer use localhost
+            smtp = smtplib.SMTP('localhost')
+            log.warning("Falled back to smtplib. If an error occurs some "
+                        "e-mails can be dropped")
+            try:
+                smtp.sendmail(from_email, emails, content)
+                log.info("Sent emails to %r", emails)
+            except smtplib.SMTPException:
+                log.exception("SMTP Error")
+            finally:
+                smtp.quit()
 def usage():
-    print "%s -r [from-email] -f [to-email] -l [ldap-host] -o [logfile]"
-    log.error("Invalid arguments %r", sys.argv)
+    print "%s -r [to-email] -f [from-email] -l [ldap-host] -o [logfile]" % sys.argv[0]
+    log.error("Invalid arguments %r" % sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
 
 def main():
-    log.info("=========== starting rolesmailer ============")
+    log.removeHandler(stream_handler) #Don't return log to output when in mailer
 
     try: #Handle cmd arguments
         opts, args = getopt.getopt(sys.argv[1:], "r:f:l:o:")
@@ -191,8 +214,9 @@ def main():
         logfile_handler = logging.FileHandler(logfile, 'w')
         log.setLevel(logging.INFO)
         log.addHandler(logfile_handler)
-        log.removeHandler(stream_handler)
 
+
+    log.info("=========== starting rolesmailer ============")
     try:
         #Message body + headers come from raw_input. Make sure they stay untouched
         content = ""
@@ -209,19 +233,11 @@ def main():
             log.error("Cannot connect to LDAP %s", ldap_server)
             return RETURN_CODES['EX_TEMPFAIL']
 
-        #Since this is the same mailer use localhost
-        smtp = smtplib.SMTP('localhost')
-        try:
-            expander = Expander(agent, smtp)
-            return_code = expander.expand(from_email, role_email, content)
-        finally:
-            smtp.quit()
-
-        return return_code
+        expander = Expander(agent)
+        return expander.expand(from_email, role_email, content)
     except:
         log.error("Unexpected error")
         return RETURN_CODES['EX_SOFTWARE']
 
 if __name__ == '__main__':
-    log.removeHandler(stream_handler)
     sys.exit(main())
