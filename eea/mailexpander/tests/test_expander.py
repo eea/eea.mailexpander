@@ -118,7 +118,6 @@ class ExpanderTest(unittest.TestCase):
             new_body = self.expander.send_emails.call_args[0][2]
 
             em = email.message_from_string(new_body)
-            assert len(em.get_all('received')) >= 2
             self.assertEqual(len(em.get_all('sender')), 1)
             self.assertEqual(em.get('sender'), role_email)
             self.assertTrue(em.get('subject').startswith('[%s]' %
