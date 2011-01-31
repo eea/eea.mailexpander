@@ -39,21 +39,43 @@ stream_handler = logging.StreamHandler()
 log.addHandler(stream_handler)
 
 class Expander(object):
-    """ """
+    """ Sendmail mailer. Uses LDAP roles to send e-mails to ldap users in that
+    specific role. Same behavior as a maillist.
+
+    """
     def __init__(self, ldap_agent):
         self.agent = ldap_agent
 
     def expand(self, from_email, role_email, content):
-        """ Get from-email and to-email (a ldap role) and the content.
-        Check if the from-email can send to the specified role and then expand
-        send the messages to all the members in that role.
+        """ Send e-mails to ldap users based on `role_email` checking if
+        `from_email` is allowed to do so. Prepend the `role` name to the e-mail
+        subject. Modify the headers according to these priciples:
+        http://tools.ietf.org/html/rfc5321#page-31
         Also queue max 50 messages per send so that the mailer can deliver them
-        asynchronously """
+        asynchronously.
+
+        Arguments::
+
+            from_email -- Sender e-mail (as recieved from sendmail)
+            role_email -- A pseudo address (Ex: ldap-role@roles.eionet.europa.eu)
+            content -- E-mail headers and body
+
+        """
 
         try:
             role = role_email.split('@')[0]
             log.info("New mail from %s to %s", from_email, role_email)
 
+            """ If an e-mail is sent to a role starting with owner- then get
+            the `owner` attributes of that `role` and send them the message.
+            This is usefull when unintended e-mail is sent such as vacation
+            reponses.
+
+            """
+            send_to_owners = False
+            if role.startswith('owner-'):
+                role = role.split('owner-')[1]
+                send_to_owners = True
             try:
                 role_data = self.agent.get_role(role)
                 assert 'members_data' in role_data, (
@@ -73,6 +95,11 @@ class Expander(object):
                 log.error("%r role not found exception", role)
                 return RETURN_CODES['EX_NOUSER']
 
+            if send_to_owners is True: #Send e-mail to owners
+                for owner_dn, owner_data in role_data['owners_data'].items():
+                    self.send_emails(from_email, owner_data['mail'], content)
+                return RETURN_CODES['EX_OK']
+
             #Check if from_email can expand
             if self.can_expand(from_email, role_data) is False:
                 return RETURN_CODES['EX_NOPERM']
@@ -88,7 +115,7 @@ class Expander(object):
 
             #Add Sender: header
             if role_email not in em.get_all('sender', []):
-                em.add_header('Sender', role_email)
+                em.add_header('Sender', 'owner-' + role_email)
 
             content = em.as_string()
 

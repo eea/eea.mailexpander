@@ -119,7 +119,7 @@ class ExpanderTest(unittest.TestCase):
 
             em = email.message_from_string(new_body)
             self.assertEqual(len(em.get_all('sender')), 1)
-            self.assertEqual(em.get('sender'), role_email)
+            self.assertEqual(em.get('sender'), 'owner-' + role_email)
             self.assertTrue(em.get('subject').startswith('[%s]' %
                                                          role_email.split('@')[0]))
 
@@ -140,9 +140,13 @@ class ExpanderTest(unittest.TestCase):
                                 partition(boundary)[2].partition(boundary)[2]
             self.assertEquals(old_body, new_body)
 
-    def test_invalid_ldap_entries(self):
-        """ Test a few invalid LDAP entries such as user and role DN's"""
-        pass
+    def test_send_to_owners(self):
+        from_email = 'user_one@example.com'
+        role_email = 'owner-test@roles.eionet.europa.eu'
+        return_code = self.expander.expand(from_email, role_email,
+                                          self.fixtures['content_7bit'])
+        self.assertEquals(self.expander.send_emails.call_args[0][1], [
+            'user_three@example.com', 'user_3333@example.com'])
 
     def test_smtp_failure(self):
         """ SMTP Failure test """

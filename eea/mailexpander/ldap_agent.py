@@ -57,12 +57,15 @@ class LdapAgent(object):
         except AssertionError:
             raise ValueError
 
-        attr['members_data'] = {}
+        def get_data(data, key, target_attr):
+            return_attr = {}
+            if data.has_key(key):
+                for dn in data[key]:
+                    if dn == '': continue #Ignore empty DN attributes
+                    return_attr[dn] = self._query(dn)
+            return {target_attr: return_attr}
 
-        if 'uniqueMember' in attr:
-            for member_dn in attr['uniqueMember']:
-                if member_dn == '': #Ignore empty uniqueMember attributes
-                    continue
-                attr['members_data'][member_dn] = self._query(member_dn)
+        attr.update(get_data(attr, 'uniqueMember', 'members_data'))
+        attr.update(get_data(attr, 'owner', 'owners_data'))
 
         return attr
