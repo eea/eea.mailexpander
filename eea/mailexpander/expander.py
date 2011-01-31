@@ -97,7 +97,8 @@ class Expander(object):
 
             if send_to_owners is True: #Send e-mail to owners
                 for owner_dn, owner_data in role_data['owners_data'].items():
-                    self.send_emails(from_email, owner_data['mail'], content)
+                    self.send_emails('owner-' + role_email, owner_data['mail'],
+                                     content)
                 return RETURN_CODES['EX_OK']
 
             #Check if from_email can expand
@@ -135,7 +136,7 @@ class Expander(object):
 
             #Send e-mails
             for emails in email_batches:
-                self.send_emails(from_email, emails, content)
+                self.send_emails('owner-' + role_email, emails, content)
             return RETURN_CODES['EX_OK']
         except:
             log.exception("Internal error")
@@ -196,7 +197,8 @@ class Expander(object):
         try:
             #This should be secure check:
             #http://docs.python.org/library/subprocess.html#using-the-subprocess-module
-            ps = Popen(["/usr/sbin/sendmail"] + emails, stdin=PIPE)
+            ps = Popen(["/usr/sbin/sendmail", '-f', from_email] + emails,
+                                                                    stdin=PIPE)
             ps.stdin.write(content)
             ps.stdin.flush()
             ps.stdin.close()
