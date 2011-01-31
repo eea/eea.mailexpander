@@ -200,8 +200,14 @@ class Expander(object):
             ps.stdin.write(content)
             ps.stdin.flush()
             ps.stdin.close()
-            log.info("Sent emails to %r", emails)
-            return not ps.wait()
+            return_code = ps.wait()
+            if return_code == RETURN_CODES['EX_OK']:
+                log.info("Sent emails to %r", emails)
+            else:
+                log.error("Failed to send emails using sendmail to %r. "
+                          "/usr/sbin/sendmail existed with %d", emails,
+                          qreturn_code)
+            return return_code
         except OSError: #fallback to smtplib
             #Since this is the same mailer use localhost
             log.exception("Cannot use sendmail program. Falling back to "
@@ -213,8 +219,11 @@ class Expander(object):
                 log.info("Sent emails to %r", emails)
             except smtplib.SMTPException:
                 log.exception("SMTP Error")
+                log.error("Failed to send emails using smtplib to %r", emails)
+                return RETURN_CODES['EX_PROTOCOL']
             finally:
                 smtp.quit()
+            return RETURN_CODES['EX_OK']
 def usage():
     print "%s -r [to-email] -f [from-email] -l [ldap-host] -o [logfile]" % sys.argv[0]
     log.error("Invalid arguments %r" % sys.argv)
