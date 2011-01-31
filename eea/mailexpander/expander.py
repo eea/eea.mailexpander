@@ -114,7 +114,7 @@ class Expander(object):
             em.replace_header('subject', "[%s] %s"  % (role, subject))
 
             #Add Sender: header
-            if role_email not in em.get_all('sender', []):
+            if 'owner-' + role_email not in em.get_all('sender', []):
                 em.add_header('Sender', 'owner-' + role_email)
 
             content = em.as_string()
