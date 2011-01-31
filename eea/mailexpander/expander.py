@@ -201,7 +201,7 @@ class Expander(object):
             ps.stdin.flush()
             ps.stdin.close()
             return_code = ps.wait()
-            if return_code == RETURN_CODES['EX_OK']:
+            if return_code in (RETURN_CODES['EX_OK'], RETURN_CODES['EX_TEMPFAIL']):
                 log.info("Sent emails to %r", emails)
             else:
                 log.error("Failed to send emails using sendmail to %r. "
