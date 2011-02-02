@@ -36,6 +36,8 @@ sys.tracebacklimit = 0
 log = logging.getLogger('MAILEXPANDER')
 log.setLevel(logging.INFO)
 stream_handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+stream_handler.setFormatter(formatter)
 log.addHandler(stream_handler)
 
 class Expander(object):
@@ -161,7 +163,9 @@ class Expander(object):
 
         if 'permittedSender' in role_data:
             for sender_pattern in role_data['permittedSender']:
-                if sender_pattern == 'owners':
+                if sender_pattern == 'anyone':
+                    return True
+                elif sender_pattern == 'owners':
                     if 'owner' in role_data:
                         for owner_dn in role_data['owner']:
                             try:

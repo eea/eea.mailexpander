@@ -219,6 +219,36 @@ class ExpanderTest(unittest.TestCase):
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
+    def test_anyone_can_expand(self):
+        """ Anyone can expand.
+        'anyone' value in permittedSender attribute
+
+        """
+        user_dn = self.agent._user_dn
+
+        self.agent.get_role = Mock(return_value={
+            'description': 'anyone',
+            'owner': [user_dn('userone')],
+            'members_data': {
+                user_dn('userone'): {
+                    'cn': ['User one'],
+                    'mail': ['user_one@example.com'],
+                },
+                user_dn('usertest1'): {
+                    'cn': ['User 1'],
+                    'mail': ['user.1@example.com'],
+                },
+            },
+            'uniqueMember': [
+                user_dn('userone'),
+                user_dn('usertwo'),
+            ],
+            'permittedSender': ['anyone',],
+        })
+        return_code = self.expander.expand('test12342424@email.com',
+                                      'test_empty@roles.eionet.europa.eu',
+                                      self.fixtures['content_7bit'])
+        self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
     def test_ldap(self):
         """ Test ldap errors """
