@@ -21,7 +21,7 @@ setup(
     install_requires=['python-ldap'],
     entry_points={
         'console_scripts': [
-            'mailexpander = eea.mailexpander.expander:main',
+            'roleexpander = eea.mailexpander.expander:main',
         ]
     },
 )

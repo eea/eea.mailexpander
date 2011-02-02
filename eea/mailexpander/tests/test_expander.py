@@ -8,7 +8,10 @@ import os
 import smtplib
 import unittest
 from copy import deepcopy
-from email.iterators import body_line_iterator
+try:
+    from email.iterators import body_line_iterator
+except ImportError: #py2.4
+    from email.Iterators import body_line_iterator
 from mock import Mock, patch, wraps
 
 from eea.mailexpander.expander import Expander, RETURN_CODES, log
@@ -40,9 +43,9 @@ class ExpanderTest(unittest.TestCase):
             fixture_path = os.path.join(fixtures_dir, fixture_filename)
             if os.path.isfile(fixture_path):
                 content = None
-                with open(fixture_path, 'rb') as f:
-                    content = f.read()
-                    f.close()
+                f =  open(fixture_path, 'rb')
+                content = f.read()
+                f.close()
                 self.fixtures[os.path.splitext(fixture_filename)[0]] = content
 
         role_dn = self.agent._role_dn
@@ -132,13 +135,14 @@ class ExpanderTest(unittest.TestCase):
                 if header not in ignore_headers:
                     self.assertEquals(value, old_em.get(header))
 
-            #Based on boundary make sure the message body is untouched
-            boundary = em.get_boundary()
-            old_body = old_em.as_string().rpartition(boundary)[0].\
-                                partition(boundary)[2].partition(boundary)[2]
-            new_body = em.as_string().rpartition(boundary)[0].\
-                                partition(boundary)[2].partition(boundary)[2]
-            self.assertEquals(old_body, new_body)
+            if hasattr(str, 'partition'): #Don't test if <2.5
+                #Based on boundary make sure the message body is untouched
+                boundary = em.get_boundary()
+                old_body = old_em.as_string().rpartition(boundary)[0].\
+                                    partition(boundary)[2].partition(boundary)[2]
+                new_body = em.as_string().rpartition(boundary)[0].\
+                                    partition(boundary)[2].partition(boundary)[2]
+                self.assertEquals(old_body, new_body)
 
     def test_send_to_owners(self):
         from_email = 'user_one@example.com'

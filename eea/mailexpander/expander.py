@@ -150,6 +150,7 @@ class Expander(object):
         allowed to expand:
 
         permittedSender -- Possible values:
+                            - 'anyone' (All senders are accepted)
                             - 'members' (All `uniqueMember` attributes),
                             - 'owners' (All `owner` attributes),
                             - *@domain.com, admin.*@domain.com (fnmatch patters)
@@ -227,8 +228,9 @@ class Expander(object):
                 log.exception("SMTP Error")
                 log.error("Failed to send emails using smtplib to %r", emails)
                 return RETURN_CODES['EX_PROTOCOL']
-            finally:
-                smtp.quit()
+            except:
+                log.exception("Unknown smtplib error")
+            smtp.quit()
             return RETURN_CODES['EX_OK']
 def usage():
     print "%s -r [to-email] -f [from-email] -l [ldap-host] -o [logfile]" % sys.argv[0]

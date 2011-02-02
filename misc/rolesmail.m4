@@ -1,7 +1,7 @@
 PUSHDIVERT(-1)
 
-ifdef(`EXPANDER_MAILER_PATH',, `define(`EXPANDER_MAILER_PATH', /usr/local/sbin/mailexpander)')
-ifdef(`EXPANDER_MAILER_ARGS',, `define(`EXPANDER_MAILER_ARGS', `mailexpander -l ldap.eionet.europa.eu -r $u')')dnl
+ifdef(`EXPANDER_MAILER_PATH',, `define(`EXPANDER_MAILER_PATH', /usr/local/sbin/roleexpander)')
+ifdef(`EXPANDER_MAILER_ARGS',, `define(`EXPANDER_MAILER_ARGS', `roleexpander -l ldap.eionet.europa.eu -r $u')')dnl
 
 POPDIVERT
 
