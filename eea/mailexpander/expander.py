@@ -162,10 +162,10 @@ class Expander(object):
         from_email = from_email.lower()
 
         if 'permittedSender' in role_data:
+            if 'anyone' in role_data['permittedSender']:
+                return True
             for sender_pattern in role_data['permittedSender']:
-                if sender_pattern == 'anyone':
-                    return True
-                elif sender_pattern == 'owners':
+                if sender_pattern == 'owners':
                     if 'owner' in role_data:
                         for owner_dn in role_data['owner']:
                             try:
