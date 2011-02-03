@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+__version__ = """$Id$"""
+
 import email
 import getopt
 import ldap
 import logging
+from logging.handlers import SysLogHandler
 import smtplib
 import sys
 import time
@@ -33,8 +36,8 @@ RETURN_CODES = {
 }
 
 sys.tracebacklimit = 0
-log = logging.getLogger('MAILEXPANDER')
-log.setLevel(logging.INFO)
+log = logging.getLogger('rolesexpander')
+log.setLevel(logging.DEBUG)
 stream_handler = logging.StreamHandler()
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 stream_handler.setFormatter(formatter)
@@ -58,7 +61,7 @@ class Expander(object):
 
         Arguments::
 
-            from_email -- Sender e-mail (as recieved from sendmail)
+            from_email -- Sender e-mail (as received from sendmail)
             role_email -- A pseudo address (Ex: ldap-role@roles.eionet.europa.eu)
             content -- E-mail headers and body
 
@@ -82,8 +85,9 @@ class Expander(object):
                 role_data = self.agent.get_role(role)
                 assert 'members_data' in role_data, (
                     '`uniqueMember` attribute is missing')
-                assert 'owner' in role_data, (
-                    '`owner` attribute is missing')
+                # It is perfectly legit to have no owner
+                #assert 'owner' in role_data, (
+                #    '`owner` attribute is missing')
             except AssertionError:
                 log.exception("In %r role:" % role)
                 return RETURN_CODES['EX_NOUSER']
@@ -209,11 +213,11 @@ class Expander(object):
             ps.stdin.close()
             return_code = ps.wait()
             if return_code in (RETURN_CODES['EX_OK'], RETURN_CODES['EX_TEMPFAIL']):
-                log.info("Sent emails to %r", emails)
+                log.debug("Sent emails to %r", emails)
             else:
                 log.error("Failed to send emails using sendmail to %r. "
                           "/usr/sbin/sendmail existed with %d", emails,
-                          qreturn_code)
+                          return_code)
             return return_code
         except OSError: #fallback to smtplib
             #Since this is the same mailer use localhost
@@ -223,7 +227,7 @@ class Expander(object):
             smtp = smtplib.SMTP('localhost')
             try:
                 smtp.sendmail(from_email, emails, content)
-                log.info("Sent emails to %r", emails)
+                log.debug("Sent emails to %r", emails)
             except smtplib.SMTPException:
                 log.exception("SMTP Error")
                 log.error("Failed to send emails using smtplib to %r", emails)
@@ -234,7 +238,8 @@ class Expander(object):
             return RETURN_CODES['EX_OK']
 def usage():
     print "%s -r [to-email] -f [from-email] -l [ldap-host] -o [logfile]" % sys.argv[0]
-    log.error("Invalid arguments %r" % sys.argv)
+    # You can't log when you have just removed the log handler
+    #log.error("Invalid arguments %r" % sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
 
 def main():
@@ -257,12 +262,18 @@ def main():
         usage()
 
     if logfile is not None:
-        logfile_handler = logging.FileHandler(logfile, 'a')
+        if logfile == 'syslog':
+            log_handler = SysLogHandler('/dev/log', SysLogHandler.LOG_MAIL)
+            formatter = logging.Formatter("%(name)s: %(levelname)s - %(message)s")
+            log_handler.setFormatter(formatter)
+        else:
+            log_handler = logging.FileHandler(logfile, 'a')
+            formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            log_handler.setFormatter(formatter)
         log.setLevel(logging.INFO)
-        log.addHandler(logfile_handler)
+        log.addHandler(log_handler)
 
-
-    log.info("=========== starting rolesmailer ============")
+    log.debug("=========== starting rolesmailer ============")
     try:
         #Message body + headers come from raw_input. Make sure they stay untouched
         content = ""
