@@ -116,9 +116,8 @@ class Expander(object):
             em = email.message_from_string(content)
             #Prepend to subject:
             subject = em.get('subject')
-            if ("[%s] " % role) in subject:
-                subject = subject.replace(("[%s]" % role), '')
-            em.replace_header('subject', "[%s] %s"  % (role, subject))
+            if not ("[%s] " % role) in subject:
+                em.replace_header('subject', "[%s] %s"  % (role, subject))
 
             #Add Sender: header
             sender = 'owner-' + role_email
