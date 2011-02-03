@@ -103,15 +103,16 @@ class Expander(object):
 
             if send_to_owners is True: #Send e-mail to owners
                 for owner_dn, owner_data in role_data['owners_data'].items():
-                    self.send_emails('owner-' + role_email, owner_data['mail'],
+                    retval = self.send_emails(from_email, owner_data['mail'],
                                      content)
+                    if retval != RETURN_CODES['EX_OK']: return retval
                 return RETURN_CODES['EX_OK']
 
             #Check if from_email can expand
             if self.can_expand(from_email, role_data) is False:
                 return RETURN_CODES['EX_NOPERM']
 
-            #Add the necessary headers such as Recieved and modify the subject
+            #Add the necessary headers such as Received and modify the subject
             #with [role]
             em = email.message_from_string(content)
             #Prepend to subject:
@@ -141,7 +142,8 @@ class Expander(object):
 
             #Send e-mails
             for emails in email_batches:
-                self.send_emails('owner-' + role_email, emails, content)
+                retval = self.send_emails('owner-' + role_email, emails, content)
+                if retval != RETURN_CODES['EX_OK']: return retval
             return RETURN_CODES['EX_OK']
         except:
             log.exception("Internal error")
@@ -213,9 +215,10 @@ class Expander(object):
             return_code = ps.wait()
             if return_code in (RETURN_CODES['EX_OK'], RETURN_CODES['EX_TEMPFAIL']):
                 log.debug("Sent emails to %r", emails)
+                return RETURN_CODES['EX_OK']
             else:
                 log.error("Failed to send emails using sendmail to %r. "
-                          "/usr/sbin/sendmail existed with %d", emails,
+                          "/usr/sbin/sendmail exited with code %d", emails,
                           return_code)
             return return_code
         except OSError: #fallback to smtplib
@@ -235,6 +238,7 @@ class Expander(object):
                 log.exception("Unknown smtplib error")
             smtp.quit()
             return RETURN_CODES['EX_OK']
+
 def usage():
     print "%s -r [to-email] -f [from-email] -l [ldap-host] -o [logfile]" % sys.argv[0]
     # You can't log when you have just removed the log handler
