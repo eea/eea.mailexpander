@@ -122,17 +122,25 @@ class Expander(object):
 
             #Add Sender: header
             sender = 'owner-' + role_email
-            if 'sender' in em:
-                em.replace_header('Sender', sender)
-            else:
-                em.add_header('Sender', sender)
+            del em['sender'] # Exception won't be raised
+            em['sender'] = sender
+            # List-XX is described in RFC 2369
+            del em['list-help']
+            del em['list-subscribe']
+            del em['list-unsubscribe']
+            del em['list-owner']
+            # List-ID is described in RFC 2919
+            del em['list-id']
+            em['list-id'] = '<%s>' % role_email.replace('@','.')
+            del em['list-post']
+            em['list-post'] = '<mailto:%s>' % role_email # Used by Thunderbird and KMail
 
             content = em.as_string()
 
             #Split the emails in to batches
             email_batches = [[]]
             batch = 0
-            batch_size = 50 #Send 50 emails batches
+            batch_size = 50 #Send in email batches
 
             for dn, data in role_data['members_data'].iteritems():
                 if len(email_batches[batch]) >= batch_size:

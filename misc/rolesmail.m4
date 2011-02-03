@@ -16,4 +16,5 @@ Mrolesmail, P=EXPANDER_MAILER_PATH,
 		S=EnvFromSMTP/HdrFromSMTP,
 		R=EnvToSMTP/HdrFromSMTP,
 		T=DNS/RFC822/SMTP,
+		U=daemon,
 		A=EXPANDER_MAILER_ARGS
