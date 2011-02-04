@@ -17,6 +17,7 @@ class LdapAgent(object):
         return conn
 
     def _query(self, dn):
+        # This query naively thinks that all searches return something
         return self.conn.search_s(dn, ldap.SCOPE_BASE)[0][1]
 
     def _role_dn(self, role_id):
@@ -53,7 +54,7 @@ class LdapAgent(object):
         try:
             assert len(result) == 1
             dn, attr = result[0]
-            assert dn == query_dn
+            assert dn.lower() == query_dn.lower()
         except AssertionError:
             raise ValueError
 
@@ -62,7 +63,8 @@ class LdapAgent(object):
             if data.has_key(key):
                 for dn in data[key]:
                     if dn == '': continue #Ignore empty DN attributes
-                    return_attr[dn] = self._query(dn)
+                    try: return_attr[dn] = self._query(dn)
+                    except: pass # Ignore members that don't exist in ldap any longer
             return {target_attr: return_attr}
 
         attr.update(get_data(attr, 'uniqueMember', 'members_data'))
