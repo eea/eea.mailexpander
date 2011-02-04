@@ -78,6 +78,7 @@ class Expander(object):
 
             """
             send_to_owners = False
+            #FIXME: owner- could be spelled OWNER- or Owner-
             if role.startswith('owner-'):
                 role = role.split('owner-')[1]
                 send_to_owners = True
@@ -212,6 +213,8 @@ class Expander(object):
         """ Use /usr/bin/sendmail or fallback to smtplib.
 
         """
+        if len(emails) == 0: # Nobody to send to - it happens
+            return RETURN_CODES['EX_OK']
         try:
             #This should be secure check:
             #http://docs.python.org/library/subprocess.html#using-the-subprocess-module

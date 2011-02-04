@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+
+__version__ = """$Id$"""
+
 import ldap, ldap.filter
 
 class LdapAgent(object):
