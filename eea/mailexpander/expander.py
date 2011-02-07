@@ -78,8 +78,7 @@ class Expander(object):
 
             """
             send_to_owners = False
-            #FIXME: owner- could be spelled OWNER- or Owner-
-            if role.startswith('owner-'):
+            if role.lower().startswith('owner-'):
                 role = role.split('owner-')[1]
                 send_to_owners = True
             try:

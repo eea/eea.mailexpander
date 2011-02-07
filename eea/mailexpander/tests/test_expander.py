@@ -32,7 +32,7 @@ class ExpanderTest(unittest.TestCase):
         self.mock_conn = self.agent.conn
 
         self.expander = Expander(self.agent)
-        self.expander.send_emails = Mock()
+        self.expander.send_emails = Mock(return_value=RETURN_CODES['EX_OK'])
 
         #Load fixtures from ./fixtures directory into dictionary with keys as
         #filenames without extentions
@@ -126,13 +126,14 @@ class ExpanderTest(unittest.TestCase):
             self.assertTrue(em.get('subject').startswith('[%s]' %
                                                          role_email.split('@')[0]))
 
-            ignore_headers = ('Received', 'Sender', 'Subject', ) #Checked above
+            ignore_headers = ('received', 'sender', 'subject', 'list-id',
+                              'list-post', ) #Checked above
             #Check the rest of the message, make sure they stay the same
             old_em = email.message_from_string(
                         email.message_from_string(fixture_content).as_string())
 
             for header, value in em.items():
-                if header not in ignore_headers:
+                if header.lower() not in ignore_headers:
                     self.assertEquals(value, old_em.get(header))
 
             if hasattr(str, 'partition'): #Don't test if <2.5
@@ -169,6 +170,8 @@ class ExpanderTest(unittest.TestCase):
         def send_emails_called(from_email, emails, content):
             """ Content is modified but this is not the subject of this test"""
             assert emails == ['user_two@example.com', 'user_one@example.com']
+            return RETURN_CODES['EX_OK']
+
         self.expander.send_emails.side_effect = send_emails_called
 
         role_email = 'test@roles.eionet.europa.eu'
@@ -312,6 +315,7 @@ class ExpanderTest(unittest.TestCase):
             assert len(emails) <= 50
             global total_mails
             total_mails += len(emails)
+            return RETURN_CODES['EX_OK']
 
         self.expander.send_emails.side_effect = send_emails_called
         return_code = self.expander.expand('user_one@example.com',
@@ -325,16 +329,7 @@ class ExpanderTest(unittest.TestCase):
 
         """
 
-        #No members data
-        self.agent.get_role = Mock(return_value={'members_data': {},
-                                    'description': 'empty role'})
-
-        return_code = self.expander.expand('test@email.com',
-                                      'test_empty@roles.eionet.europa.eu',
-                                      self.fixtures['content_7bit'])
-        self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
-
-        #No owner attribute - should fail
+        #No owner attribute - should not fail
         self.agent.get_role = Mock(return_value={
             'description': 'no owner',
             'members_data': {
@@ -351,11 +346,14 @@ class ExpanderTest(unittest.TestCase):
                 'uid=userone,ou=Users,o=EIONET,l=Europe',
                 'uid=usertwo,ou=Users,o=EIONET,l=Europe',
             ],
+            'permittedSender': [
+                'test@email.com'
+            ]
         })
         return_code = self.expander.expand('test@email.com',
                                       'test_empty@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
-        self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
+        self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
 if __name__ == '__main__':
     unittest.main()

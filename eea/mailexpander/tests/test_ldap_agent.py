@@ -105,7 +105,11 @@ class LdapAgentTest(unittest.TestCase):
             return called_mock(dn, scope, calls_list)
         self.mock_conn.search_s.side_effect = mock_called
 
-        self.assertRaises(IndexError, self.agent.get_role, 'A')
+        #Should not raise an error but instead return the data with existing
+        #users
+        data = self.agent.get_role('A')
+        assert len(data['members_data']) == 1
+        assert data['members_data'].keys() == [user_dn('userone')]
 
     def test_empty_member(self):
         """ When an uniqueMember is empty """
