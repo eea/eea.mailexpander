@@ -1,0 +1,9 @@
+[expander]
+sendmail_path: /usr/sbin/sendmail
+log: syslog ; or absolute path to log file
+
+[ldap]
+ldap_server: localhost:389
+users_dn: ou=Users,o=EIONET,l=Europe
+roles_dn: ou=Roles,o=EIONET,l=Europe
+encoding: utf-8

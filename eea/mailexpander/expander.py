@@ -7,11 +7,13 @@ import email
 import getopt
 import ldap
 import logging
-from logging.handlers import SysLogHandler
 import smtplib
 import sys
 import time
+
+from ConfigParser import ConfigParser
 from fnmatch import fnmatch
+from logging.handlers import SysLogHandler
 from subprocess import Popen, PIPE
 
 from ldap_agent import LdapAgent
@@ -48,8 +50,9 @@ class Expander(object):
     specific role. Same behavior as a maillist.
 
     """
-    def __init__(self, ldap_agent):
+    def __init__(self, ldap_agent, sendmail_path='/usr/sbin/sendmail'):
         self.agent = ldap_agent
+        self.sendmail_path = sendmail_path
 
     def expand(self, from_email, role_email, content):
         """ Send e-mails to ldap users based on `role_email` checking if
@@ -217,7 +220,7 @@ class Expander(object):
         try:
             #This should be secure check:
             #http://docs.python.org/library/subprocess.html#using-the-subprocess-module
-            ps = Popen(["/usr/sbin/sendmail", '-f', from_email] + emails,
+            ps = Popen([self.sendmail_path, '-f', from_email] + emails,
                                                                     stdin=PIPE)
             ps.stdin.write(content)
             ps.stdin.flush()
@@ -250,7 +253,8 @@ class Expander(object):
             return RETURN_CODES['EX_OK']
 
 def usage():
-    print "%s -r [to-email] -f [from-email] -l [ldap-host] -o [logfile]" % sys.argv[0]
+    print ("%s -r [to-email] -f [from-email] -c [config-file] -l [ldap-host] "
+          "-o [logfile]") % sys.argv[0]
     # You can't log when you have just removed the log handler
     #log.error("Invalid arguments %r" % sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
@@ -260,17 +264,26 @@ def main():
     log.removeHandler(stream_handler)
 
     try: #Handle cmd arguments
-        opts, args = getopt.getopt(sys.argv[1:], "r:f:l:o:")
+        opts, args = getopt.getopt(sys.argv[1:], "c:r:f:l:o:")
     except getopt.GetoptError, err:
         usage()
 
     logfile = None
+    ldap_config = {}
+    sendmail_path = ''
     try:
         opts = dict(opts)
         from_email = opts['-f']
         role_email = opts['-r']
-        ldap_server = opts['-l']
-        logfile = opts.get('-o')
+        if '-c' in opts:
+            config = ConfigParser()
+            config.read([opts['-c']])
+            logfile = opts.get('-o', config.get('expander', 'log'))
+            sendmail_path = config.get('expander', 'sendmail_path')
+            ldap_config = dict(config.items('ldap'))
+        else:
+            ldap_config['ldap_server'] = opts['-l']
+            logfile = opts.get('-o')
     except KeyError:
         usage()
 
@@ -298,12 +311,15 @@ def main():
 
         #Open connection with the ldap
         try:
-            agent = LdapAgent(ldap_server=ldap_server)
+            agent = LdapAgent(**ldap_config)
         except:
             log.error("Cannot connect to LDAP %s", ldap_server)
             return RETURN_CODES['EX_TEMPFAIL']
 
-        expander = Expander(agent)
+        if sendmail_path:
+            expander = Expander(agent, sendmail_path)
+        else:
+            expander = Expander(agent)
         return expander.expand(from_email, role_email, content)
     except:
         log.error("Unexpected error")
