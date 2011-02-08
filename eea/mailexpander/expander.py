@@ -7,7 +7,6 @@ import email
 import getopt
 import ldap
 import logging
-import mailbox
 import smtplib
 import sys
 import time
@@ -153,9 +152,14 @@ class Expander(object):
                     email_batches.append([]) #Init new batch
                 email_batches[batch].extend(data['mail'])
 
+            # We write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
+            # We don't lock the file, and this is a mistake.
             if self.mailbox is not None:
-                mbox = mailbox.mbox(self.mailbox)
-                mbox.add(em)
+                mbox = open(self.mailbox,'ab')
+                mbox.write('From ' + from_email + '  ' + time.asctime() + '\n')
+                mbox.write(content)
+                mbox.write('\n')
+                mbox.close()
 
             #Send e-mails
             for emails in email_batches:
