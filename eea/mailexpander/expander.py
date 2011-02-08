@@ -7,6 +7,7 @@ import email
 import getopt
 import ldap
 import logging
+import mailbox
 import smtplib
 import sys
 import time
@@ -50,9 +51,10 @@ class Expander(object):
     specific role. Same behavior as a maillist.
 
     """
-    def __init__(self, ldap_agent, sendmail_path='/usr/sbin/sendmail'):
+    def __init__(self, ldap_agent, **config):
         self.agent = ldap_agent
-        self.sendmail_path = sendmail_path
+        self.sendmail_path = config.get('sendmail_path', '/usr/sbin/sendmail')
+        self.mailbox = config.get('mailbox', None)
 
     def expand(self, from_email, role_email, content):
         """ Send e-mails to ldap users based on `role_email` checking if
@@ -150,6 +152,10 @@ class Expander(object):
                     batch += 1
                     email_batches.append([]) #Init new batch
                 email_batches[batch].extend(data['mail'])
+
+            if self.mailbox is not None:
+                mbox = mailbox.mbox(self.mailbox)
+                mbox.add(em)
 
             #Send e-mails
             for emails in email_batches:
@@ -279,7 +285,7 @@ def main():
             config = ConfigParser()
             config.read([opts['-c']])
             logfile = opts.get('-o', config.get('expander', 'log'))
-            sendmail_path = config.get('expander', 'sendmail_path')
+            expander_config = dict(config.items('expander'))
             ldap_config = dict(config.items('ldap'))
         else:
             ldap_config['ldap_server'] = opts['-l']
@@ -316,10 +322,7 @@ def main():
             log.error("Cannot connect to LDAP %s", ldap_server)
             return RETURN_CODES['EX_TEMPFAIL']
 
-        if sendmail_path:
-            expander = Expander(agent, sendmail_path)
-        else:
-            expander = Expander(agent)
+        expander = Expander(agent, **expander_config)
         return expander.expand(from_email, role_email, content)
     except:
         log.error("Unexpected error")

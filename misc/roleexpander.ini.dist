@@ -1,6 +1,11 @@
 [expander]
 sendmail_path: /usr/sbin/sendmail
-log: syslog ; or absolute path to log file
+
+; or absolute path to log file
+log: syslog
+
+;Mailbox format
+mailbox: /tmp/mailbox/
 
 [ldap]
 ldap_server: localhost:389
