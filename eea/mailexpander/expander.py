@@ -78,9 +78,8 @@ class Expander(object):
 
             """ If an e-mail is sent to a role starting with owner- then get
             the `owner` attributes of that `role` and send them the message.
-            This is usefull when unintended e-mail is sent such as vacation
+            This is useful when unintended e-mail is sent such as vacation
             reponses.
-
             """
             send_to_owners = False
             if role.lower().startswith('owner-'):
@@ -127,18 +126,18 @@ class Expander(object):
 
             #Add Sender: header
             sender = 'owner-' + role_email
-            del em['sender'] # Exception won't be raised
-            em['sender'] = sender
-            # List-XX is described in RFC 2369
-            del em['list-help']
-            del em['list-subscribe']
-            del em['list-unsubscribe']
-            del em['list-owner']
+            del em['Sender'] # Exception won't be raised
+            em['Sender'] = sender
+            # List-Post etc. is described in RFC 2369
+            del em['List-Help']
+            del em['List-Subscribe']
+            del em['List-Unsubscribe']
+            del em['List-Owner']
             # List-ID is described in RFC 2919
-            del em['list-id']
-            em['list-id'] = '<%s>' % role_email.replace('@','.')
-            del em['list-post']
-            em['list-post'] = '<mailto:%s>' % role_email # Used by Thunderbird and KMail
+            del em['List-ID']
+            em['List-ID'] = '<%s>' % role_email.replace('@','.')
+            del em['List-Post']
+            em['List-Post'] = '<mailto:%s>' % role_email # Used by Thunderbird and KMail
 
             content = em.as_string()
 
@@ -166,8 +165,8 @@ class Expander(object):
 
     def write_to_archive(self, from_email, content):
         """ Write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
-            The lockf call can return IOError, which we abort to writing on
-            It is more important that we send the email than we save the message
+        The lockf call can return IOError, which we abort to writing on
+        It is more important that we send the email than we save the message
         """
         if self.mailbox is None:
             return # No mailbox to write to
