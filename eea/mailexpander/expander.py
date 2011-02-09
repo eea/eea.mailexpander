@@ -10,6 +10,7 @@ import logging
 import smtplib
 import sys
 import time
+import fcntl
 
 from ConfigParser import ConfigParser
 from fnmatch import fnmatch
@@ -152,14 +153,7 @@ class Expander(object):
                     email_batches.append([]) #Init new batch
                 email_batches[batch].extend(data['mail'])
 
-            # We write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
-            # We don't lock the file, and this is a mistake.
-            if self.mailbox is not None:
-                mbox = open(self.mailbox,'ab')
-                mbox.write('From ' + from_email + '  ' + time.asctime() + '\n')
-                mbox.write(content)
-                mbox.write('\n')
-                mbox.close()
+            self.write_to_archive(from_email, content)
 
             #Send e-mails
             for emails in email_batches:
@@ -169,6 +163,29 @@ class Expander(object):
         except:
             log.exception("Internal error")
             return RETURN_CODES['EX_SOFTWARE']
+
+    def write_to_archive(self, from_email, content):
+        """ Write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
+            The lockf call can return IOError, which we abort to writing on
+            It is more important that we send the email than we save the message
+        """
+        if self.mailbox is None:
+            return # No mailbox to write to
+        mboxfd = open(self.mailbox,'ab')
+        try:
+            fcntl.lockf(mboxfd, fcntl.LOCK_EX | fcntl.LOCK_NB) # Get an exclusive lock - don't block
+            # We could try 10 times and sleep one second between each try
+            # if we get an EAGAIN or EACCES error
+            # except IOError, e:
+            #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
+        except:
+            log.error("Unable to acquire exclusive lock on %s" % self.mailbox)
+            return
+        mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
+        mboxfd.write(content)
+        mboxfd.write('\n')
+        fcntl.lockf(mboxfd, fcntl.LOCK_UN) # Not really necessary - we close it
+        mboxfd.close()
 
     def can_expand(self, from_email, role_data):
         """ Check if the from_email has the permissions to send to the current
