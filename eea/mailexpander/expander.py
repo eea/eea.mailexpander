@@ -11,6 +11,7 @@ import smtplib
 import sys
 import time
 import fcntl
+import string
 
 from ConfigParser import ConfigParser
 from fnmatch import fnmatch
@@ -54,7 +55,9 @@ class Expander(object):
     def __init__(self, ldap_agent, **config):
         self.agent = ldap_agent
         self.sendmail_path = config.get('sendmail_path', '/usr/sbin/sendmail')
-        self.mailbox = config.get('mailbox', None)
+        self.archivefile = config.get('mailbox', None)
+        also_string = config.get('also_send_to', '')
+        self.also_send_to = map(string.strip, also_string.split(','))
 
     def expand(self, from_email, role_email, content):
         """ Send e-mails to ldap users based on `role_email` checking if
@@ -154,6 +157,10 @@ class Expander(object):
 
             self.write_to_archive(from_email, content)
 
+            # If there are any addresses to always send to
+            if self.also_send_to != ['']:
+	        retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
+
             #Send e-mails
             for emails in email_batches:
                 retval = self.send_emails('owner-' + role_email, emails, content)
@@ -168,9 +175,9 @@ class Expander(object):
         The lockf call can return IOError, which we abort to writing on
         It is more important that we send the email than we save the message
         """
-        if self.mailbox is None:
+        if self.archivefile is None:
             return # No mailbox to write to
-        mboxfd = open(self.mailbox,'ab')
+        mboxfd = open(self.archivefile,'ab')
         try:
             fcntl.lockf(mboxfd, fcntl.LOCK_EX | fcntl.LOCK_NB) # Get an exclusive lock - don't block
             # We could try 10 times and sleep one second between each try
@@ -178,7 +185,7 @@ class Expander(object):
             # except IOError, e:
             #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
         except:
-            log.error("Unable to acquire exclusive lock on %s" % self.mailbox)
+            log.error("Unable to acquire exclusive lock on %s" % self.archivefile)
             return
         mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
         mboxfd.write(content)
@@ -339,7 +346,7 @@ def main():
         try:
             agent = LdapAgent(**ldap_config)
         except:
-            log.error("Cannot connect to LDAP %s", ldap_server)
+            log.error("Cannot connect to LDAP %s", ldap_config['ldap_server'])
             return RETURN_CODES['EX_TEMPFAIL']
 
         expander = Expander(agent, **expander_config)

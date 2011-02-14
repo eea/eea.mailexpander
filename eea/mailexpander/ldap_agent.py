@@ -6,7 +6,10 @@ import ldap, ldap.filter
 
 class LdapAgent(object):
     def __init__(self, **config):
-        self.conn = self.connect(config['ldap_server'])
+        self.ldap_server = config['ldap_server']
+        if self.ldap_server[:7] != 'ldap://':
+            self.ldap_server = 'ldap://' + self.ldap_server
+        self.conn = self.connect()
         self.conn.protocol_version = ldap.VERSION3
         self._encoding = config.get('encoding', 'utf-8')
         self._user_dn_suffix = config.get('users_dn',
@@ -14,8 +17,8 @@ class LdapAgent(object):
         self._role_dn_suffix = config.get('roles_dn',
                                           "ou=Roles,o=EIONET,l=Europe")
 
-    def connect(self, server):
-        conn = ldap.initialize('ldap://' + server)
+    def connect(self):
+        conn = ldap.initialize(self.ldap_server)
         conn.protocol_version = ldap.VERSION3
         return conn
 
