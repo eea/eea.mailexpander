@@ -159,7 +159,7 @@ class Expander(object):
 
             # If there are any addresses to always send to
             if self.also_send_to != ['']:
-	        retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
+                retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
 
             #Send e-mails
             for emails in email_batches:
@@ -251,9 +251,14 @@ class Expander(object):
         if len(emails) == 0: # Nobody to send to - it happens
             return RETURN_CODES['EX_OK']
         try:
-            #This should be secure check:
-            #http://docs.python.org/library/subprocess.html#using-the-subprocess-module
-            ps = Popen([self.sendmail_path, '-f', from_email] + emails,
+            # This should be secure check:
+            # http://docs.python.org/library/subprocess.html#using-the-subprocess-module
+            # It turns out that sendmail splits the addresses on space, eventhough
+            # there is one address per argument. See RFC5322 section 3.4
+            # Try: /usr/sbin/sendmail 'soren.roug @eea.europa.eu' and it will complain
+            # about the address. We therefore clean them with smtplib.quoteaddr
+            quotedemails = map(smtplib.quoteaddr, emails)
+            ps = Popen([self.sendmail_path, '-f', smtplib.quoteaddr(from_email), '--'] + quotedemails,
                                                                     stdin=PIPE)
             ps.stdin.write(content)
             ps.stdin.flush()
@@ -268,7 +273,8 @@ class Expander(object):
                           return_code)
             return return_code
         except OSError: #fallback to smtplib
-            #Since this is the same mailer use localhost
+            # Since this is the same mailer we use localhost
+            # Smtplib quotes the addresses internally
             log.exception("Cannot use sendmail program. Falling back to "
                           "smtplib.")
             log.warning("If the smtp connection fails some emails will be lost")
