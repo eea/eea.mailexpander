@@ -216,6 +216,7 @@ class Expander(object):
             if 'anyone' in role_data['permittedSender']:
                 return True
             for sender_pattern in role_data['permittedSender']:
+                sender_pattern = sender_pattern.lower()
                 if sender_pattern == 'owners':
                     if 'owner' in role_data:
                         for owner_dn in role_data['owner']:
