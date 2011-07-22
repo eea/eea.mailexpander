@@ -153,7 +153,7 @@ class Expander(object):
                 if len(email_batches[batch]) >= batch_size:
                     batch += 1
                     email_batches.append([]) #Init new batch
-                clean_addresses = filter(lambda i: i.find('@')>0, data['mail'])
+                clean_addresses = filter(lambda i: i.find('@')>0, data.get('mail',['']))
                 email_batches[batch].extend(clean_addresses)
 
             self.write_to_archive(from_email, content)
