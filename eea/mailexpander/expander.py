@@ -222,9 +222,9 @@ class Expander(object):
                         for owner_dn in role_data['owner']:
                             try:
                                 owner = self.agent._query(owner_dn)
-                            except ldap.INVALID_DN_SYNTAX:
-                                log.exception("Invalid `owner` DN: %s",
-                                              owner_dn)
+                            except:
+                                # Log that we couldn't get the email.
+                                log.exception("Invalid `owner` DN: %s", owner_dn)
                                 continue
                             if from_email in map(str.lower, owner['mail']):
                                 return True
@@ -241,7 +241,8 @@ class Expander(object):
                     persons_emails = self.agent._query(permitted_dn)['mail']
                     if from_email in map(str.lower, persons_emails):
                         return True
-                except ldap.INVALID_DN_SYNTAX:
+                except:
+                    # Log that we couldn't get the email.
                     log.exception("Invalid DN: %s", permitted_dn)
                     continue
         return False

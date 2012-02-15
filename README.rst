@@ -15,3 +15,8 @@ Usage/Installation
 ------------------
 
 To configure the sendmail see docs/SENDMAIL.rst
+
+Unit testing
+------------
+Go to eea/mailexpander/tests and run the tests. You have to have the mock package installed.
+
