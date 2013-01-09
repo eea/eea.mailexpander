@@ -175,8 +175,14 @@ class Expander(object):
             for emails in email_batches:
                 retval = self.send_emails('owner-' + role_email, emails, content)
                 if retval != RETURN_CODES['EX_OK']: return retval
-            retval = self.send_confirmation_email(subject, from_email, role)
-            return retval
+            try:
+                retval = self.send_confirmation_email(subject, from_email, role)
+            except Exception, e:
+                log.exception("Error sending confirmation")
+            else:
+                if retval != RETURN_CODES['EX_OK']:
+                    log.error("Error sending confirmation: %d", retval)
+            return RETURN_CODES['EX_OK']
         except:
             log.exception("Internal error")
             return RETURN_CODES['EX_SOFTWARE']
