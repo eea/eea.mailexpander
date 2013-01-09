@@ -21,8 +21,13 @@ from subprocess import Popen, PIPE
 
 from ldap_agent import LdapAgent
 
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+try:
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+except ImportError, e:
+    from email.MIMEText import MIMEText
+    from email.MIMEMultipart import MIMEMultipart
+
 
 RETURN_CODES = {
    'EX_OK':           0,  # successful termination
