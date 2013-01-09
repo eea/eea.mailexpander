@@ -9,6 +9,7 @@ import ldap
 import logging
 import smtplib
 import sys
+import os
 import time
 import fcntl
 import string
@@ -19,6 +20,9 @@ from logging.handlers import SysLogHandler
 from subprocess import Popen, PIPE
 
 from ldap_agent import LdapAgent
+
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 RETURN_CODES = {
    'EX_OK':           0,  # successful termination
@@ -58,6 +62,7 @@ class Expander(object):
         self.archivefile = config.get('mailbox', None)
         also_string = config.get('also_send_to', '')
         self.also_send_to = map(string.strip, also_string.split(','))
+        self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
 
     def expand(self, from_email, role_email, content):
         """ Send e-mails to ldap users based on `role_email` checking if
@@ -123,9 +128,13 @@ class Expander(object):
             #with [role]
             em = email.message_from_string(content)
             #Prepend to subject:
-            subject = em.get('subject')
+            subject = em.get('subject', '(no-subject)')
             if not ("[%s] " % role) in subject:
-                em.replace_header('subject', "[%s] %s"  % (role, subject))
+                subject = "[%s] %s"  % (role, subject)
+                try:
+                    em.replace_header('subject', subject)
+                except KeyError:
+                    em.add_header('subject', subject)
 
             #Add Sender: header
             sender = 'owner-' + role_email
@@ -166,7 +175,8 @@ class Expander(object):
             for emails in email_batches:
                 retval = self.send_emails('owner-' + role_email, emails, content)
                 if retval != RETURN_CODES['EX_OK']: return retval
-            return RETURN_CODES['EX_OK']
+            retval = self.send_confirmation_email(subject, from_email, role)
+            return retval
         except:
             log.exception("Internal error")
             return RETURN_CODES['EX_SOFTWARE']
@@ -247,6 +257,50 @@ class Expander(object):
                     continue
         return False
 
+    def send_confirmation_email(self, subject, to_email, role):
+        """ If sending emails succeeded send a confirmation email to sender and
+        let him know that everything went as expected
+
+        """
+        log.info("Sending confirmation email to %s", to_email)
+        content = ""
+        confirmation_email_template = os.path.join(os.path.dirname(__file__),
+                                                   'templates',
+                                                   'confirmation_email.html')
+        if os.path.isfile(confirmation_email_template):
+            f = open(confirmation_email_template, 'rb')
+            content = f.read()
+            f.close()
+
+        content = content.replace('{{role_id}}', role)
+
+        html_part = MIMEText(content, 'html')
+        message = MIMEMultipart('alternative')
+        message['Subject'] = "Conmfirmation: %s" % subject
+        message['From'] = self.noreply
+        message['To'] = to_email
+        message.attach(html_part)
+
+        smtp = smtplib.SMTP('localhost')
+        try:
+            smtp.sendmail(self.noreply, to_email, message.as_string())
+            log.debug('Confirmation email sent to %s', to_email)
+        except smtplib.SMTPException:
+            log.exception("SMTP Error")
+            log.error("Failed to send confirmation email using smtplib to %s",
+                      to_email)
+            return RETURN_CODES['EX_PROTOCOL']
+        except:
+            log.exception("Unknown smtplib error")
+            return RETURN_CODES['EX_UNAVAILABLE']
+        finally:
+            try:
+                smtp.quit()
+            except:
+                pass
+
+        return RETURN_CODES['EX_OK']
+
     def send_emails(self, from_email, emails, content):
         """ Use /usr/bin/sendmail or fallback to smtplib.
 
@@ -291,7 +345,12 @@ class Expander(object):
                 return RETURN_CODES['EX_PROTOCOL']
             except:
                 log.exception("Unknown smtplib error")
-            smtp.quit()
+                return RETURN_CODES['EX_UNAVAILABLE']
+            finally:
+                try:
+                    smtp.quit()
+                except:
+                    pass
             return RETURN_CODES['EX_OK']
 
 def usage():

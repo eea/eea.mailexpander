@@ -7,6 +7,9 @@ log: syslog
 ;Mailbox format
 mailbox: /tmp/mailbox/
 
+;no-reply email address
+no-reply: no-reply@eea.europa.eu
+
 [ldap]
 ldap_server: localhost:389
 users_dn: ou=Users,o=EIONET,l=Europe
