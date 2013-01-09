@@ -287,7 +287,7 @@ class Expander(object):
 
         html_part = MIMEText(content, 'html')
         message = MIMEMultipart('alternative')
-        message['Subject'] = "Conmfirmation: %s" % subject
+        message['Subject'] = "Confirmation: %s" % subject
         message['From'] = self.noreply
         message['To'] = to_email
         message.attach(html_part)
