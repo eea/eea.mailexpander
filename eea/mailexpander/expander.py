@@ -289,16 +289,17 @@ class Expander(object):
 
         smtp = smtplib.SMTP('localhost')
         try:
-            smtp.sendmail(self.noreply, to_email, message.as_string())
-            log.debug('Confirmation email sent to %s', to_email)
-        except smtplib.SMTPException:
-            log.exception("SMTP Error")
-            log.error("Failed to send confirmation email using smtplib to %s",
-                      to_email)
-            return RETURN_CODES['EX_PROTOCOL']
-        except:
-            log.exception("Unknown smtplib error")
-            return RETURN_CODES['EX_UNAVAILABLE']
+            try:
+                smtp.sendmail(self.noreply, to_email, message.as_string())
+                log.debug('Confirmation email sent to %s', to_email)
+            except smtplib.SMTPException:
+                log.exception("SMTP Error")
+                log.error("Failed to send confirmation email using smtplib to %s",
+                          to_email)
+                return RETURN_CODES['EX_PROTOCOL']
+            except:
+                log.exception("Unknown smtplib error")
+                return RETURN_CODES['EX_UNAVAILABLE']
         finally:
             try:
                 smtp.quit()
@@ -343,15 +344,16 @@ class Expander(object):
             log.warning("If the smtp connection fails some emails will be lost")
             smtp = smtplib.SMTP('localhost')
             try:
-                smtp.sendmail(from_email, emails, content)
-                log.debug("Sent emails to %r", emails)
-            except smtplib.SMTPException:
-                log.exception("SMTP Error")
-                log.error("Failed to send emails using smtplib to %r", emails)
-                return RETURN_CODES['EX_PROTOCOL']
-            except:
-                log.exception("Unknown smtplib error")
-                return RETURN_CODES['EX_UNAVAILABLE']
+                try:
+                    smtp.sendmail(from_email, emails, content)
+                    log.debug("Sent emails to %r", emails)
+                except smtplib.SMTPException:
+                    log.exception("SMTP Error")
+                    log.error("Failed to send emails using smtplib to %r", emails)
+                    return RETURN_CODES['EX_PROTOCOL']
+                except:
+                    log.exception("Unknown smtplib error")
+                    return RETURN_CODES['EX_UNAVAILABLE']
             finally:
                 try:
                     smtp.quit()
