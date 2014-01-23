@@ -233,6 +233,13 @@ class Expander(object):
         #Convert to lower in case of mixed-case e-mail addresses
         from_email = from_email.lower()
 
+        # Fix for #18085;
+        # Treat the case where the email address contains the = character.
+        # the eionet accounts only use "clean" emails
+        ident, host = from_email.split('@') # assume a single @ inside email address
+        name = ident.split('=')[-1]
+        from_email = "@".join((name, host))
+
         if 'permittedSender' in role_data:
             if 'anyone' in role_data['permittedSender']:
                 return True
