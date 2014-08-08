@@ -125,6 +125,16 @@ class Expander(object):
                     if retval != RETURN_CODES['EX_OK']: return retval
                 return RETURN_CODES['EX_OK']
 
+            # also add permitted from all the parents
+            # this allows "inheriting" permissions from above roles
+            parent_roles = agent._ancestor_roles_dn()[1:]
+            for parent_role_dn in parent_roles:
+                role_info = agent._role_info(parent_role_dn)
+                role_data['permittedSender'].append(role_info.get('permittedSender')
+                role_data['permittedPerson'].append(role_info.get('permittedPerson')
+            role_data['permittedSender'] = filter(None, set(role_data['permittedSender']))
+            role_data['permittedPerson'] = filter(None, set(role_data['permittedPerson']))
+
             #Check if from_email can expand
             if self.can_expand(from_email, role_data) is False:
                 return RETURN_CODES['EX_NOPERM']
