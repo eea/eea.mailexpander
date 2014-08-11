@@ -22,6 +22,33 @@ class LdapAgent(object):
         conn.protocol_version = ldap.VERSION3
         return conn
 
+    def _ancestor_roles_dn(self, role_dn):
+        """
+        Given a subrole dn, returns a list of all ancestors. First is
+        the given subrole, then the ancestors, with last element the top-most
+        one.
+        """
+
+        # Example usage::
+        #     >>> self._ancestor_roles_dn(
+        #     ...   "cn=eionet-nfp,cn=eionet,ou=Roles,o=EIONET,l=Europe")
+        #     ['cn=eionet-nfp,ou=Roles,o=EIONET,l=Europe',
+        #      'cn=eionet,ou=Roles,o=EIONET,l=Europe']
+
+        assert role_dn.endswith(',' + self._role_dn_suffix), "Invalid Role DN"
+        role_dn_start = role_dn[: - (len(self._role_dn_suffix) + 1)]
+        dn_bits = role_dn_start.split(',')
+        dn_bits.reverse()
+
+        ancestors = []
+        accumulator = self._role_dn_suffix
+        for bit in dn_bits:
+            assert bit.startswith('cn=')
+            accumulator = bit + "," + accumulator
+            ancestors.insert(0, accumulator)
+
+        return ancestors
+
     def _query(self, dn):
         # This query naively thinks that all searches return something
         return self.conn.search_s(dn, ldap.SCOPE_BASE)[0][1]

@@ -1,8 +1,8 @@
+from eea.mailexpander import ldap_agent
+from mock import Mock   #, patch    #, wraps
 import ldap
-from mock import Mock, patch, wraps
 import unittest
 
-from eea.mailexpander import ldap_agent
 
 def called_mock(dn, scope, calls_list):
     expected_dn, expected_scope, ret = calls_list.pop(0)
@@ -10,9 +10,11 @@ def called_mock(dn, scope, calls_list):
     assert scope == expected_scope
     return ret
 
+
 class StubbedLdapAgent(ldap_agent.LdapAgent):
-    def connect(self, server):
+    def connect(self):
         return Mock()
+
 
 class LdapAgentTest(unittest.TestCase):
     def setUp(self):

@@ -127,11 +127,12 @@ class Expander(object):
 
             # also add permitted from all the parents
             # this allows "inheriting" permissions from above roles
-            parent_roles = agent._ancestor_roles_dn()[1:]
+            role_dn = self.agent._role_dn(role)
+            parent_roles = self.agent._ancestor_roles_dn(role_dn)[1:]
             for parent_role_dn in parent_roles:
-                role_info = agent._role_info(parent_role_dn)
-                role_data['permittedSender'].append(role_info.get('permittedSender')
-                role_data['permittedPerson'].append(role_info.get('permittedPerson')
+                role_info = self.agent._role_info(parent_role_dn)
+                role_data['permittedSender'].append(role_info.get('permittedSender'))
+                role_data['permittedPerson'].append(role_info.get('permittedPerson'))
             role_data['permittedSender'] = filter(None, set(role_data['permittedSender']))
             role_data['permittedPerson'] = filter(None, set(role_data['permittedPerson']))
 
@@ -192,7 +193,7 @@ class Expander(object):
                 if retval != RETURN_CODES['EX_OK']: return retval
             try:
                 retval = self.send_confirmation_email(subject, from_email, role)
-            except Exception, e:
+            except Exception:
                 log.exception("Error sending confirmation")
             else:
                 if retval != RETURN_CODES['EX_OK']:
@@ -396,12 +397,12 @@ def main():
 
     try: #Handle cmd arguments
         opts, args = getopt.getopt(sys.argv[1:], "c:r:f:l:o:")
-    except getopt.GetoptError, err:
+    except getopt.GetoptError:
         usage()
 
     logfile = None
     ldap_config = {}
-    sendmail_path = ''
+    #sendmail_path = ''
     try:
         opts = dict(opts)
         from_email = opts['-f']

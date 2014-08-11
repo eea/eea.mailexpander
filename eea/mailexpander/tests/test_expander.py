@@ -8,11 +8,11 @@ import os
 import smtplib
 import unittest
 from copy import deepcopy
-try:
-    from email.iterators import body_line_iterator
-except ImportError: #py2.4
-    from email.Iterators import body_line_iterator
-from mock import Mock, patch, wraps
+# try:
+#     from email.iterators import body_line_iterator
+# except ImportError: #py2.4
+#     from email.Iterators import body_line_iterator
+from mock import Mock   #, patch    #, wraps
 
 from eea.mailexpander.expander import Expander, RETURN_CODES, log
 from test_ldap_agent import StubbedLdapAgent
@@ -109,7 +109,7 @@ class ExpanderTest(unittest.TestCase):
         """
         from_email = 'user_one@example.com'
         role_email = 'test@roles.eionet.europa.eu'
-        dest_emails = ['user_two@example.com', 'user_one@example.com']
+        #dest_emails = ['user_two@example.com', 'user_one@example.com']
 
         self.expander.can_expand = Mock(return_value=True)
 
@@ -148,8 +148,8 @@ class ExpanderTest(unittest.TestCase):
     def test_send_to_owners(self):
         from_email = 'user_one@example.com'
         role_email = 'owner-test@roles.eionet.europa.eu'
-        return_code = self.expander.expand(from_email, role_email,
-                                          self.fixtures['content_7bit'])
+        self.expander.expand(from_email, role_email,
+                             self.fixtures['content_7bit'])
         self.assertEquals(self.expander.send_emails.call_args[0][1], [
             'user_three@example.com', 'user_3333@example.com'])
 
@@ -318,9 +318,9 @@ class ExpanderTest(unittest.TestCase):
             return RETURN_CODES['EX_OK']
 
         self.expander.send_emails.side_effect = send_emails_called
-        return_code = self.expander.expand('user_one@example.com',
-                                      'test@roles.eionet.europa.eu',
-                                      self.fixtures['content_7bit'])
+        self.expander.expand('user_one@example.com',
+                             'test@roles.eionet.europa.eu',
+                             self.fixtures['content_7bit'])
         self.assertEqual(total_mails, 120)
 
     def test_empty_role(self):
