@@ -125,10 +125,8 @@ class Expander(object):
                     if retval != RETURN_CODES['EX_OK']: return retval
                 return RETURN_CODES['EX_OK']
 
-            role_data = self.add_inherited_senders(role_id=role,
-                                                   role_data=role_data)
             #Check if from_email can expand
-            if self.can_expand(from_email, role_data) is False:
+            if self.can_expand(from_email, role, role_data) is False:
                 return RETURN_CODES['EX_NOPERM']
 
             #Add the necessary headers such as Received and modify the subject
@@ -266,7 +264,7 @@ class Expander(object):
         fcntl.lockf(mboxfd, fcntl.LOCK_UN) # Not really necessary - we close it
         mboxfd.close()
 
-    def can_expand(self, from_email, role_data):
+    def can_expand(self, from_email, role, role_data):
         """ Check if the from_email has the permissions to send to the current
         role. In the current role lookup 2 attributes to see if the users are
         allowed to expand:
@@ -279,6 +277,8 @@ class Expander(object):
                             - alex@domain.com (simple email addresses)
         permittedPerson -- DN of a user (match the user's email with `from_email`)
         """
+        role_data = self.add_inherited_senders(role_id=role,
+                                                role_data=role_data)
 
         #Convert to lower in case of mixed-case e-mail addresses
         from_email = from_email.lower()

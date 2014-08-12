@@ -106,19 +106,22 @@ class ExpanderTest(unittest.TestCase):
         """
 
         from_email = 'user_one@example.com'
-        #role_email = 'test@roles.eionet.europa.eu'
+        role = "user_one"
 
         role_data = {'description': 'no owner',
-                     'members_data': {
-                         'uid=userone,ou=Users,o=EIONET,l=Europe': {
-                             'cn':['User one'], 'mail':['user_one@example.com']},
-                         'uid=usertest1,ou=Users,o=EIONET,l=Europe': {
-                             'cn':['User 1'], 'mail':['user.1@example.com']}},
+                     'members_data': {},
                      'permittedSender': ['test@email.com'],
-                     'uniqueMember': ['uid=userone,ou=Users,o=EIONET,l=Europe',
-                                      'uid=usertwo,ou=Users,o=EIONET,l=Europe']}
-        self.expander.can_expand(from_email, role_data)
+                     }
+        assert self.expander.can_expand(from_email, role, role_data) == False
 
+        def patched(role_id, role_data):
+            role_data['permittedSender'].append('user_one@example.com')
+            return role_data
+
+        old = self.expander.add_inherited_senders
+        self.expander.add_inherited_senders = patched
+        assert self.expander.can_expand(from_email, role, role_data) == True
+        self.expander.add_inherited_senders = old
 
     def test_send(self):
         """ Test successful sending of the e-mails (7bit, 8bit, base64, binary)
