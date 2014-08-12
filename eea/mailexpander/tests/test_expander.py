@@ -101,6 +101,25 @@ class ExpanderTest(unittest.TestCase):
 
         self.mock_conn.search_s.side_effect = ldap_search_called
 
+    def test_can_expand_by_inheritance(self):
+        """ Test if people specified in above hierarchy can expand
+        """
+
+        from_email = 'user_one@example.com'
+        #role_email = 'test@roles.eionet.europa.eu'
+
+        role_data = {'description': 'no owner',
+                     'members_data': {
+                         'uid=userone,ou=Users,o=EIONET,l=Europe': {
+                             'cn':['User one'], 'mail':['user_one@example.com']},
+                         'uid=usertest1,ou=Users,o=EIONET,l=Europe': {
+                             'cn':['User 1'], 'mail':['user.1@example.com']}},
+                     'permittedSender': ['test@email.com'],
+                     'uniqueMember': ['uid=userone,ou=Users,o=EIONET,l=Europe',
+                                      'uid=usertwo,ou=Users,o=EIONET,l=Europe']}
+        self.expander.can_expand(from_email, role_data)
+
+
     def test_send(self):
         """ Test successful sending of the e-mails (7bit, 8bit, base64, binary)
         After the modifications of the headers during the expantion

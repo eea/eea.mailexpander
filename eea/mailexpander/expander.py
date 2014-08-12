@@ -125,19 +125,8 @@ class Expander(object):
                     if retval != RETURN_CODES['EX_OK']: return retval
                 return RETURN_CODES['EX_OK']
 
-            # also add permitted from all the parents
-            # this allows "inheriting" permissions from above roles
-            if not 'permittedPerson' in role_data:
-                role_data['permittedPerson'] = []
-            role_dn = self.agent._role_dn(role)
-            parent_roles = self.agent._ancestor_roles_dn(role_dn)[1:]
-            for parent_role_dn in parent_roles:
-                role_info = self.agent._role_info(parent_role_dn)
-                role_data['permittedSender'].append(role_info.get('permittedSender'))
-                role_data['permittedPerson'].append(role_info.get('permittedPerson'))
-            role_data['permittedSender'] = filter(None, set(role_data['permittedSender']))
-            role_data['permittedPerson'] = filter(None, set(role_data['permittedPerson']))
-
+            role_data = self.add_inherited_senders(role_id=role,
+                                                   role_data=role_data)
             #Check if from_email can expand
             if self.can_expand(from_email, role_data) is False:
                 return RETURN_CODES['EX_NOPERM']
@@ -205,6 +194,55 @@ class Expander(object):
             log.exception("Internal error")
             return RETURN_CODES['EX_SOFTWARE']
 
+    def add_inherited_senders(self, role_id, role_data):
+        """ Add as permitted senders everyone that inherits
+        """
+        # also add permitted from all the parents
+        # this allows "inheriting" permissions from above roles
+        # see http://taskman.eionet.europa.eu/issues/20422
+
+        if not 'permittedPerson' in role_data:
+            role_data['permittedPerson'] = []
+
+        role_dn = self.agent._role_dn(role_id)
+        parent_roles = self.agent._ancestor_roles_dn(role_dn)[1:]
+        senders = set(role_data['permittedSender'])
+
+        for parent_role_dn in parent_roles:
+            role_info = self.agent._role_info(parent_role_dn)
+
+            for sender_pattern in role_info['permittedSender']:
+                sender_pattern = sender_pattern.lower()
+                if sender_pattern == 'owners':
+                    if 'owner' in role_info:
+                        for owner_dn in role_info['owner']:
+                            try:
+                                owner = self.agent._query(owner_dn)
+                            except:
+                                # Log that we couldn't get the email.
+                                log.exception("Invalid `owner` DN: %s", owner_dn)
+                                continue
+                            senders.add(owner['mail'].lower())
+                elif sender_pattern == 'members':
+                    members = role_info.get('members', [])
+                    for user_dn in members:
+                        user_info = self.agent._query(user_dn)
+                        senders.add(user_info['mail'].lower())
+
+            for person_dn in role_info.get('permittedPerson', []):
+                try:
+                    email = self.agent._query(person_dn)['mail']
+                except:
+                    # Log that we couldn't get the email.
+                    log.exception("Invalid DN: %s", person_dn)
+                    continue
+                else:
+                    senders.add(email)
+
+        role_data['permittedSender'] = filter(None, set(senders))
+
+        return role_data
+
     def write_to_archive(self, from_email, content):
         """ Write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
         The lockf call can return IOError, which we abort to writing on
@@ -240,7 +278,6 @@ class Expander(object):
                             - *@domain.com, admin.*@domain.com (fnmatch patters)
                             - alex@domain.com (simple email addresses)
         permittedPerson -- DN of a user (match the user's email with `from_email`)
-
         """
 
         #Convert to lower in case of mixed-case e-mail addresses
@@ -276,6 +313,7 @@ class Expander(object):
                                 return True
                 elif fnmatch(from_email, sender_pattern):
                     return True
+
         if 'permittedPerson' in role_data:
             for permitted_dn in role_data['permittedPerson']:
                 try:
@@ -286,6 +324,7 @@ class Expander(object):
                     # Log that we couldn't get the email.
                     log.exception("Invalid DN: %s", permitted_dn)
                     continue
+
         return False
 
     def send_confirmation_email(self, subject, to_email, role):
