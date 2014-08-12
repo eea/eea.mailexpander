@@ -147,10 +147,10 @@ class ExpanderTest(unittest.TestCase):
                     "cn=top-middle-end,cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe":
                         {'permittedSender':[]},
                     "cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe":
-                        {'permittedSender':['owner',
-                                            'parent_owner@example.com',
+                        {'permittedSender':['owners',
+                                            'parent_sender@example.com',
                                             '*@eea.europa.eu'],
-                         'owner':'parent_owner'},
+                         'owner':['parent_owner']},
                     "cn=top,ou=Roles,o=EIONET,l=Europe":
                         {'permittedSender':[], 'permittedPerson':['top_person']},
                 }
@@ -161,8 +161,11 @@ class ExpanderTest(unittest.TestCase):
             'top-middle-end', {'permittedSender':['control']})
 
         assert set(role_data['permittedSender']) == set(
-            ['control', 'parent_owner@example.com',
-             'parent_sender@example.com', 'root_parent_person@example.com'])
+            ['control',
+             'parent_owner@example.com',
+             '*@eea.europa.eu',
+             'parent_sender@example.com',
+             'root_parent_person@example.com'])
 
     def test_send(self):
         """ Test successful sending of the e-mails (7bit, 8bit, base64, binary)
