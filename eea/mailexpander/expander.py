@@ -226,6 +226,8 @@ class Expander(object):
                     for user_dn in members:
                         user_info = self.agent._query(user_dn)
                         senders.add(user_info['mail'].lower())
+                elif '@' in sender_pattern:
+                    senders.add(sender_pattern)
 
             for person_dn in role_info.get('permittedPerson', []):
                 try:

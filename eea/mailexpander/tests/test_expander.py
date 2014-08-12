@@ -123,6 +123,47 @@ class ExpanderTest(unittest.TestCase):
         assert self.expander.can_expand(from_email, role, role_data) == True
         self.expander.add_inherited_senders = old
 
+    def test_add_inherited_senders(self):
+        class Agent(Mock):
+            def _role_dn(self, role_id):
+                return "cn=top-middle-end,cn=top-middle,"\
+                       "cn=top,ou=Roles,o=EIONET,l=Europe"
+            def _ancestor_roles_dn(self, role_dn):
+                return [
+                    "cn=top-middle-end,cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe",
+                    "cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe",
+                    "cn=top,ou=Roles,o=EIONET,l=Europe",
+                ]
+
+            def _query(self, role_id):
+                data = {
+                    'parent_owner': {'mail':'parent_owner@example.com'},
+                    'top_person': {'mail':'root_parent_person@example.com'}
+                }
+                return data[role_id]
+
+            def _role_info(self, role_dn):
+                data = {
+                    "cn=top-middle-end,cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe":
+                        {'permittedSender':[]},
+                    "cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe":
+                        {'permittedSender':['owner',
+                                            'parent_owner@example.com',
+                                            '*@eea.europa.eu'],
+                         'owner':'parent_owner'},
+                    "cn=top,ou=Roles,o=EIONET,l=Europe":
+                        {'permittedSender':[], 'permittedPerson':['top_person']},
+                }
+                return data[role_dn]
+
+        self.expander.agent = Agent()
+        role_data = self.expander.add_inherited_senders(
+            'top-middle-end', {'permittedSender':['control']})
+
+        assert set(role_data['permittedSender']) == set(
+            ['control', 'parent_owner@example.com',
+             'parent_sender@example.com', 'root_parent_person@example.com'])
+
     def test_send(self):
         """ Test successful sending of the e-mails (7bit, 8bit, base64, binary)
         After the modifications of the headers during the expantion
