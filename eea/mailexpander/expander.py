@@ -127,6 +127,8 @@ class Expander(object):
 
             # also add permitted from all the parents
             # this allows "inheriting" permissions from above roles
+            if not 'permittedPerson' in role_data:
+                role_data['permittedPerson'] = []
             role_dn = self.agent._role_dn(role)
             parent_roles = self.agent._ancestor_roles_dn(role_dn)[1:]
             for parent_role_dn in parent_roles:
