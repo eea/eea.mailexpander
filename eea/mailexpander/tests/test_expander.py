@@ -135,12 +135,13 @@ class ExpanderTest(unittest.TestCase):
                     "cn=top,ou=Roles,o=EIONET,l=Europe",
                 ]
 
-            def _query(self, role_id):
+            def _query(self, user_id):
                 data = {
                     'parent_owner': {'mail':'parent_owner@example.com'},
-                    'top_person': {'mail':'root_parent_person@example.com'}
+                    'top_person': {'mail':'root_parent_person@example.com'},
+                    'member_one': {'mail':'member_one@example.com'}
                 }
-                return data[role_id]
+                return data[user_id]
 
             def _role_info(self, role_dn):
                 data = {
@@ -148,9 +149,12 @@ class ExpanderTest(unittest.TestCase):
                         {'permittedSender':[]},
                     "cn=top-middle,cn=top,ou=Roles,o=EIONET,l=Europe":
                         {'permittedSender':['owners',
+                                            'members',
                                             'parent_sender@example.com',
                                             '*@eea.europa.eu'],
-                         'owner':['parent_owner']},
+                         'owner':['parent_owner'],
+                         'members': ['member_one'],
+                         },
                     "cn=top,ou=Roles,o=EIONET,l=Europe":
                         {'permittedSender':[], 'permittedPerson':['top_person']},
                 }
@@ -165,6 +169,7 @@ class ExpanderTest(unittest.TestCase):
              'parent_owner@example.com',
              '*@eea.europa.eu',
              'parent_sender@example.com',
+             'member_one@example.com',
              'root_parent_person@example.com'])
 
     def test_send(self):
