@@ -1,1 +1,1 @@
-bin/py.test -k expander --ignore=./local --ignore=./lib
+bin/py.test -k test_send --ignore=./local/lib/ --ignore=./lib/
