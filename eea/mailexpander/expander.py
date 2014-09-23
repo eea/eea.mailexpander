@@ -69,7 +69,7 @@ class Expander(object):
         self.also_send_to = map(string.strip, also_string.split(','))
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
 
-    def expand(self, from_email, role_email, content):
+    def expand(self, from_email, role_email, content, debug_mode=False):
         """ Send e-mails to ldap users based on `role_email` checking if
         `from_email` is allowed to do so. Prepend the `role` name to the e-mail
         subject. Modify the headers according to these priciples:
@@ -170,23 +170,25 @@ class Expander(object):
                 clean_addresses = filter(lambda i: i.find('@')>0, data.get('mail',['']))
                 email_batches[batch].extend(clean_addresses)
 
-            self.write_to_archive(from_email, content)
+            if not debug_mode:
+                self.write_to_archive(from_email, content)
 
-            # If there are any addresses to always send to
-            if self.also_send_to != ['']:
-                retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
+                # If there are any addresses to always send to
+                if self.also_send_to != ['']:
+                    retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
 
-            #Send e-mails
-            for emails in email_batches:
-                retval = self.send_emails('owner-' + role_email, emails, content)
-                if retval != RETURN_CODES['EX_OK']: return retval
-            try:
-                retval = self.send_confirmation_email(subject, from_email, role)
-            except Exception:
-                log.exception("Error sending confirmation")
-            else:
-                if retval != RETURN_CODES['EX_OK']:
-                    log.error("Error sending confirmation: %d", retval)
+                #Send e-mails
+                for emails in email_batches:
+                    retval = self.send_emails('owner-' + role_email, emails, content)
+                    if retval != RETURN_CODES['EX_OK']: return retval
+                try:
+                    retval = self.send_confirmation_email(subject, from_email, role)
+                except Exception:
+                    log.exception("Error sending confirmation")
+                else:
+                    if retval != RETURN_CODES['EX_OK']:
+                        log.error("Error sending confirmation: %d", retval)
+
             return RETURN_CODES['EX_OK']
         except:
             log.exception("Internal error")
@@ -439,13 +441,14 @@ def main():
     log.removeHandler(stream_handler)
 
     try: #Handle cmd arguments
-        opts, args = getopt.getopt(sys.argv[1:], "c:r:f:l:o:")
+        opts, args = getopt.getopt(sys.argv[1:], "c:r:f:l:o:t")
     except getopt.GetoptError:
         usage()
 
     logfile = None
     ldap_config = {}
     #sendmail_path = ''
+    debug_mode = False
     try:
         opts = dict(opts)
         from_email = opts['-f']
@@ -459,6 +462,10 @@ def main():
         else:
             ldap_config['ldap_server'] = opts['-l']
             logfile = opts.get('-o')
+
+        if '-t' in opts:
+            debug_mode = True
+
     except KeyError:
         usage()
 
@@ -478,11 +485,12 @@ def main():
     try:
         #Message body + headers come from raw_input. Make sure they stay untouched
         content = ""
-        while True:
-            buffer = sys.stdin.read()
-            if not buffer:
-                break
-            content += buffer
+        if not debug_mode:
+            while True:
+                buffer = sys.stdin.read()
+                if not buffer:
+                    break
+                content += buffer
 
         #Open connection with the ldap
         try:
@@ -492,7 +500,7 @@ def main():
             return RETURN_CODES['EX_TEMPFAIL']
 
         expander = Expander(agent, **expander_config)
-        return expander.expand(from_email, role_email, content)
+        return expander.expand(from_email, role_email, content, debug_mode)
     except:
         log.error("Unexpected error")
         return RETURN_CODES['EX_SOFTWARE']

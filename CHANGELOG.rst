@@ -1,3 +1,8 @@
+0.8 (2014-09-23)
+======================
+* Feature: added the -t switch to test if an expansion will go or not.
+  [tiberich #20422]
+
 0.7 (2014-09-23)
 ======================
 * Bug fix: added _role_info method to ldap agent
