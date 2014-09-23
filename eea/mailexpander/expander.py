@@ -222,12 +222,12 @@ class Expander(object):
                                 # Log that we couldn't get the email.
                                 log.exception("Invalid `owner` DN: %s", owner_dn)
                                 continue
-                            senders.add(owner['mail'].lower())
+                            senders.update([x.lower() for x in owner['mail']])
                 elif sender_pattern == 'members':
                     members = role_info.get('members', [])
                     for user_dn in members:
                         user_info = self.agent._query(user_dn)
-                        senders.add(user_info['mail'].lower())
+                        senders.updated([x.lower() for x in user_info['mail']])
                 elif '@' in sender_pattern:
                     senders.add(sender_pattern)
 
