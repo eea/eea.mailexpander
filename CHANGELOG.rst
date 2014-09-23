@@ -1,3 +1,8 @@
+0.7 (2014-09-23)
+======================
+* Bug fix: added _role_info method to ldap agent
+  [tiberich #20422]
+
 0.6 (2014-08-13)
 ======================
 * Change: inherit permitted senders from parent roles
