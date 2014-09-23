@@ -75,8 +75,7 @@ class LdapAgent(object):
         assert ',' not in user_id
         return 'uid=' + user_id + ',' + self._user_dn_suffix
 
-    def _role_info(self, role_id):
-        query_dn = self._role_dn(role_id)
+    def _role_info(self, query_dn):
         result = self.conn.search_s(query_dn, ldap.SCOPE_BASE)
         try:
             assert len(result) == 1
