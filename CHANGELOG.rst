@@ -1,3 +1,8 @@
+0.9 (2014-09-23)
+======================
+* Bug fix: fix mail expansion when mail info for owner, from LDAP search returns list
+  [tiberich #20422]
+
 0.8 (2014-09-23)
 ======================
 * Feature: added the -t switch to test if an expansion will go or not.
