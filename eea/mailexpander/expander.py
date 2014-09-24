@@ -233,7 +233,7 @@ class Expander(object):
 
             for person_dn in role_info.get('permittedPerson', []):
                 try:
-                    email = self.agent._query(person_dn)['mail']
+                    email = self.agent._query(person_dn)['mail'][0]
                 except:
                     # Log that we couldn't get the email.
                     log.exception("Invalid DN: %s", person_dn)

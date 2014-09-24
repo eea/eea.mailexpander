@@ -1,3 +1,8 @@
+0.10 (2014-09-24)
+======================
+* Bug fix: fix bug in expanding with permitted sender email
+  [tiberich #20422]
+
 0.9 (2014-09-23)
 ======================
 * Bug fix: fix mail expansion when mail info for owner, from LDAP search returns list
