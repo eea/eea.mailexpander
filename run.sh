@@ -5,7 +5,7 @@ URL="https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.11.4.tar.
 
 curl $URL > /tmp/virtualenv.tgz
 tar xzf /tmp/virtualenv.tgz -C ./
-/usr/bin/python2.7 $VENV ./
+/usr/bin/python2.6 $VENV ./ --system-site-packages
 
 bin/pip install zc.buildout
 bin/pip install ZopeSkel

@@ -449,6 +449,7 @@ def main():
     ldap_config = {}
     #sendmail_path = ''
     debug_mode = False
+    expander_config = {}
     try:
         opts = dict(opts)
         from_email = opts['-f']
