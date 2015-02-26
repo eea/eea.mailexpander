@@ -3,23 +3,24 @@
 
 __version__ = """$Id$"""
 
-import email
-import getopt
-import ldap
-import logging
-import smtplib
-import sys
-import os
-import time
-import fcntl
-import string
 
 from ConfigParser import ConfigParser
 from fnmatch import fnmatch
+from ldap_agent import LdapAgent
 from logging.handlers import SysLogHandler
 from subprocess import Popen, PIPE
-
-from ldap_agent import LdapAgent
+import email
+import fcntl
+import getopt
+import ldap
+import logging
+import operator
+import os
+import re
+import smtplib
+import string
+import sys
+import time
 
 try:
     from email.mime.text import MIMEText
@@ -48,6 +49,7 @@ RETURN_CODES = {
    'EX_CONFIG':       78, # configuration error
 }
 
+
 sys.tracebacklimit = 0
 log = logging.getLogger('rolesexpander')
 log.setLevel(logging.DEBUG)
@@ -56,11 +58,37 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 stream_handler.setFormatter(formatter)
 log.addHandler(stream_handler)
 
+
+class SimplifiedRole(object):
+    """
+    A simple way of representing and addressing attributes
+    of an NFP/NRC Role
+
+    """
+
+    def __init__(self, role_id, description):
+        m = re.match(r'^eionet-(nfp|nrc)-(.*)(mc|cc)-([^-]*)$', role_id,
+                     re.IGNORECASE)
+        if m:
+            self.type = m.groups()[0].lower()
+            self.country = m.groups()[3].lower()
+            self.role_id = role_id
+            self.description = description
+        else:
+            raise ValueError("Not a valid NFP/NRC role")
+        if not self.country or (self.type not in ('nfp', 'nrc')):
+            raise ValueError("Not a valid NFP/NRC role")
+
+    def split(self, s):
+        return self.role_id.split(s)
+
+
 class Expander(object):
     """ Sendmail mailer. Uses LDAP roles to send e-mails to ldap users in that
     specific role. Same behavior as a maillist.
 
     """
+
     def __init__(self, ldap_agent, **config):
         self.agent = ldap_agent
         self.sendmail_path = config.get('sendmail_path', '/usr/sbin/sendmail')
@@ -68,6 +96,25 @@ class Expander(object):
         also_string = config.get('also_send_to', '')
         self.also_send_to = map(string.strip, also_string.split(','))
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
+
+    def get_nfp_roles(self, agent, uid):
+        out = []
+        filterstr = ("(&(objectClass=groupOfUniqueNames)(uniqueMember=%s))" %
+                    agent._user_dn(uid))
+        nfp_roles = agent.filter_roles("eionet-nfp-*-*",
+                                    prefix_dn="cn=eionet-nfp,cn=eionet",
+                                    filterstr=filterstr,
+                                    attrlist=("description",))
+
+        for nfp in nfp_roles:
+            try:
+                role = SimplifiedRole(nfp[0], nfp[1]['description'][0])
+            except ValueError:
+                continue
+            else:
+                out.append(role)
+
+        return sorted(out, key=operator.attrgetter('role_id'))
 
     def expand(self, from_email, role_email, content, debug_mode=False):
         """ Send e-mails to ldap users based on `role_email` checking if
@@ -245,29 +292,6 @@ class Expander(object):
 
         return role_data
 
-    def write_to_archive(self, from_email, content):
-        """ Write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
-        The lockf call can return IOError, which we abort to writing on
-        It is more important that we send the email than we save the message
-        """
-        if self.archivefile is None:
-            return # No mailbox to write to
-        mboxfd = open(self.archivefile,'ab')
-        try:
-            fcntl.lockf(mboxfd, fcntl.LOCK_EX | fcntl.LOCK_NB) # Get an exclusive lock - don't block
-            # We could try 10 times and sleep one second between each try
-            # if we get an EAGAIN or EACCES error
-            # except IOError, e:
-            #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
-        except:
-            log.error("Unable to acquire exclusive lock on %s" % self.archivefile)
-            return
-        mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
-        mboxfd.write(content)
-        mboxfd.write('\n')
-        fcntl.lockf(mboxfd, fcntl.LOCK_UN) # Not really necessary - we close it
-        mboxfd.close()
-
     def can_expand(self, from_email, role, role_data):
         """ Check if the from_email has the permissions to send to the current
         role. In the current role lookup 2 attributes to see if the users are
@@ -281,8 +305,9 @@ class Expander(object):
                             - alex@domain.com (simple email addresses)
         permittedPerson -- DN of a user (match the user's email with `from_email`)
         """
+
         role_data = self.add_inherited_senders(role_id=role,
-                                                role_data=role_data)
+                                               role_data=role_data)
 
         #Convert to lower in case of mixed-case e-mail addresses
         from_email = from_email.lower()
@@ -429,12 +454,37 @@ class Expander(object):
                     pass
             return RETURN_CODES['EX_OK']
 
+    def write_to_archive(self, from_email, content):
+        """ Write the email to a MBOX file. (mailbox only does read-only in Python 2.4)
+        The lockf call can return IOError, which we abort to writing on
+        It is more important that we send the email than we save the message
+        """
+        if self.archivefile is None:
+            return # No mailbox to write to
+        mboxfd = open(self.archivefile,'ab')
+        try:
+            fcntl.lockf(mboxfd, fcntl.LOCK_EX | fcntl.LOCK_NB) # Get an exclusive lock - don't block
+            # We could try 10 times and sleep one second between each try
+            # if we get an EAGAIN or EACCES error
+            # except IOError, e:
+            #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
+        except:
+            log.error("Unable to acquire exclusive lock on %s" % self.archivefile)
+            return
+        mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
+        mboxfd.write(content)
+        mboxfd.write('\n')
+        fcntl.lockf(mboxfd, fcntl.LOCK_UN) # Not really necessary - we close it
+        mboxfd.close()
+
+
 def usage():
-    print ("%s -r [to-email] -f [from-email] -c [config-file] -l [ldap-host] "
-          "-o [logfile]") % sys.argv[0]
+    print ("%s [-t] -r [to-email] -f [from-email] -c [config-file] "
+           "-l [ldap-host] -o [logfile]") % sys.argv[0]
     # You can't log when you have just removed the log handler
     #log.error("Invalid arguments %r" % sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
+
 
 def main():
     #Don't return log to output when in mailer
@@ -505,6 +555,7 @@ def main():
     except:
         log.error("Unexpected error")
         return RETURN_CODES['EX_SOFTWARE']
+
 
 if __name__ == '__main__':
     sys.exit(main())
