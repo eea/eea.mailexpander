@@ -97,11 +97,11 @@ class Expander(object):
         self.also_send_to = map(string.strip, also_string.split(','))
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
 
-    def get_nfp_roles(self, agent, uid):
+    def _get_nfp_roles(self, uid):
         out = []
         filterstr = ("(&(objectClass=groupOfUniqueNames)(uniqueMember=%s))" %
-                    agent._user_dn(uid))
-        nfp_roles = agent.filter_roles("eionet-nfp-*-*",
+                    self.agent._user_dn(uid))
+        nfp_roles = self.agent.filter_roles("eionet-nfp-*-*",
                                     prefix_dn="cn=eionet-nfp,cn=eionet",
                                     filterstr=filterstr,
                                     attrlist=("description",))
@@ -115,6 +115,12 @@ class Expander(object):
                 out.append(role)
 
         return sorted(out, key=operator.attrgetter('role_id'))
+
+    def get_nfp_countries(self, uid):
+        """ Returns a list of country codes where user (uid) is NFP
+        """
+
+        return [role.country for role in self._get_nfp_roles(uid)]
 
     def expand(self, from_email, role_email, content, debug_mode=False):
         """ Send e-mails to ldap users based on `role_email` checking if

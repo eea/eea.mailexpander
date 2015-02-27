@@ -2,7 +2,10 @@
 
 __version__ = """$Id$"""
 
+from string import ascii_lowercase
 import ldap, ldap.filter
+import re
+
 
 class LdapAgent(object):
     def __init__(self, **config):
@@ -115,3 +118,44 @@ class LdapAgent(object):
         attr.update(get_data(attr, 'owner', 'owners_data'))
 
         return attr
+
+    def filter_roles(
+            self, pattern, prefix_dn=None,
+            filterstr='(objectClass=groupOfUniqueNames)', attrlist=()):
+        """
+        Returns all roles matching `pattern`.
+        We can use `prefix_dn` to restrict searching pool and/or filterstr
+        Returns list of tuples, with role_id and attrs in `attrlist`
+
+        """
+        query_dn = self._role_dn_suffix
+        if prefix_dn:
+            query_dn = prefix_dn + ',' + query_dn
+        result = self.conn.search_s(query_dn, ldap.SCOPE_SUBTREE,
+                                    filterstr=filterstr, attrlist=attrlist)
+
+        pattern = pattern.lower()
+        for ch in pattern:
+            if ch not in ascii_lowercase + '-*':
+                return set()
+
+        if not pattern:
+            return set()
+
+        pattern = pattern.replace('-', r'\b\-\b').replace('*', r'.*')
+        pattern = r'\b' + pattern + r'\b'
+        compiled_pattern = re.compile(pattern)
+
+        out = []
+        in_out = set()
+        for dn, attr in result:
+            role_id = self._role_id(dn)
+            if role_id is None:
+                continue
+
+            if compiled_pattern.search(role_id.lower()) is not None:
+                if role_id not in in_out:
+                    out.append((role_id, attr))
+                    in_out.add(role_id)
+
+        return out
