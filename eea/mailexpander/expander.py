@@ -188,8 +188,9 @@ class Expander(object):
         if send_to_owners is True: #Send e-mail to owners
             for owner_dn, owner_data in role_data['owners_data'].items():
                 retval = self.send_emails(from_email, owner_data['mail'],
-                                    content)
-                if retval != RETURN_CODES['EX_OK']: return retval
+                                          content)
+                if retval != RETURN_CODES['EX_OK']:
+                    return retval
             return RETURN_CODES['EX_OK']
 
         #Check if from_email can expand
@@ -311,8 +312,11 @@ class Expander(object):
 
     def can_expand(self, from_email, role, role_data):
         """ Check if the from_email has the permissions to send to the current
-        role. In the current role lookup 2 attributes to see if the users are
-        allowed to expand:
+        role.
+
+        The current role lookup can take the following scenarios:
+
+        * Looking at the permittedSender value:
 
         permittedSender -- Possible values:
                             - 'anyone' (All senders are accepted)
@@ -320,7 +324,17 @@ class Expander(object):
                             - 'owners' (All `owner` attributes),
                             - *@domain.com, admin.*@domain.com (fnmatch patters)
                             - alex@domain.com (simple email addresses)
-        permittedPerson -- DN of a user (match the user's email with `from_email`)
+
+        This takes into account everything from parent levels, too, per
+        http://taskman.eionet.europa.eu/issues/20422
+
+        * Looking at the permittedPerson value:
+
+        permittedPerson -- DN of a user (match the user's email with
+        `from_email`)
+
+        * Checking to see if the user is an NFP for the country for that
+        role email. (Ticket http://taskman.eionet.europa.eu/issues/22529)
         """
 
         role_data = self.add_inherited_senders(role_id=role,
@@ -371,7 +385,50 @@ class Expander(object):
                     log.exception("Invalid DN: %s", permitted_dn)
                     continue
 
+        if role.startswith('eionet-nrc'):
+            country = self._country_for_role(role)
+            if country:
+                if self.is_nfp_for_country(from_email, country):
+                    return True
+
         return False
+
+    def is_nfp_for_country(self, from_email, country):
+        """ Email belongs to member of NFP role for that country code?
+        """
+
+        user_id = self.agent.get_userid_for_email(from_email)
+        if not user_id:
+            return False
+
+        nfp_roles = self.get_nfp_roles_for_country(country)
+        for role_id in nfp_roles:
+            role_data = self.agent.get_role(role_id)
+            for user_dn in role_data.get('uniqueMember', []):
+                if user_id == self.agent._user_id(user_dn):
+                    return True
+
+        return False
+
+    def _country_for_role(self, role):
+        try:
+            _, _, _, _, country = role.split('-')
+        except IndexError:
+            return None
+        return country
+
+    def get_nfp_roles_for_country(self, country_code):
+        out = []
+        filterstr = "(objectClass=groupOfUniqueNames)"
+        nfp_roles = self.agent.filter_roles("eionet-nfp-*-%s" % country_code,
+                                            prefix_dn="cn=eionet-nfp,cn=eionet",
+                                            filterstr=filterstr,
+                                            attrlist=("description",))
+
+        for nfp in nfp_roles:
+            out.append(nfp[0])
+
+        return sorted(out)
 
     def send_confirmation_email(self, subject, to_email, role):
         """ If sending emails succeeded send a confirmation email to sender and

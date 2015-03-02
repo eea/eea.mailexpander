@@ -159,3 +159,36 @@ class LdapAgent(object):
                     in_out.add(role_id)
 
         return out
+
+    def get_userid_for_email(self, email, no_disabled=True):
+        disabled_filter = "(!(employeeType=*disabled*))"
+
+        query = email.encode(self._encoding)
+        pattern = '(&(objectClass=person){0}(mail=%s))'.format(disabled_filter)
+        query_filter = ldap.filter.filter_format(pattern, (query,))
+
+        result = self.conn.search_s(self._user_dn_suffix, ldap.SCOPE_ONELEVEL,
+                                    filterstr=query_filter)
+        if result:
+            return result[0][1]['uid'][0]
+
+    def _role_id(self, role_dn):
+        if role_dn == self._role_dn_suffix:
+            return None
+        assert role_dn.endswith(',' + self._role_dn_suffix)
+        role_dn_start = role_dn[: - (len(self._role_dn_suffix) + 1)]
+        dn_bits = role_dn_start.split(',')
+        dn_bits.reverse()
+
+        current_bit = None
+        for bit in dn_bits:
+            assert bit.startswith('cn=')
+            bit = bit[len('cn='):]
+            if current_bit is None:
+                assert '-' not in bit
+            else:
+                assert bit.startswith(current_bit + '-')
+                assert '-' not in bit[len(current_bit) + 1:]
+            current_bit = bit
+
+        return current_bit
