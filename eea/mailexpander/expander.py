@@ -6,6 +6,7 @@ __version__ = """$Id$"""
 
 from ConfigParser import ConfigParser
 from fnmatch import fnmatch
+from functools import wraps
 from ldap_agent import LdapAgent
 from logging.handlers import SysLogHandler
 from subprocess import Popen, PIPE
@@ -21,6 +22,7 @@ import smtplib
 import string
 import sys
 import time
+
 
 try:
     from email.mime.text import MIMEText
@@ -83,6 +85,18 @@ class SimplifiedRole(object):
         return self.role_id.split(s)
 
 
+def log_exceptions(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            log.exception("Uncaught exception from %r", func)
+            sys.exit(RETURN_CODES['EX_SOFTWARE'])
+
+    return wrapper
+
+
 class Expander(object):
     """ Sendmail mailer. Uses LDAP roles to send e-mails to ldap users in that
     specific role. Same behavior as a maillist.
@@ -122,6 +136,7 @@ class Expander(object):
 
         return [role.country for role in self._get_nfp_roles(uid)]
 
+    @log_exceptions
     def expand(self, from_email, role_email, content, debug_mode=False):
         """ Send e-mails to ldap users based on `role_email` checking if
         `from_email` is allowed to do so. Prepend the `role` name to the e-mail
@@ -138,114 +153,110 @@ class Expander(object):
 
         """
 
+        role = role_email.split('@')[0]
+        log.info("New mail from %s to %s", from_email, role_email)
+
+        """ If an e-mail is sent to a role starting with owner- then get
+        the `owner` attributes of that `role` and send them the message.
+        This is useful when unintended e-mail is sent such as vacation
+        reponses.
+        """
+        send_to_owners = False
+        if role.lower().startswith('owner-'):
+            role = role.split('owner-')[1]
+            send_to_owners = True
         try:
-            role = role_email.split('@')[0]
-            log.info("New mail from %s to %s", from_email, role_email)
-
-            """ If an e-mail is sent to a role starting with owner- then get
-            the `owner` attributes of that `role` and send them the message.
-            This is useful when unintended e-mail is sent such as vacation
-            reponses.
-            """
-            send_to_owners = False
-            if role.lower().startswith('owner-'):
-                role = role.split('owner-')[1]
-                send_to_owners = True
-            try:
-                role_data = self.agent.get_role(role)
-                assert 'members_data' in role_data, (
-                    '`uniqueMember` attribute is missing')
-                # It is perfectly legit to have no owner
-                #assert 'owner' in role_data, (
-                #    '`owner` attribute is missing')
-            except AssertionError:
-                log.exception("In %r role:" % role)
-                return RETURN_CODES['EX_NOUSER']
-            except ldap.SERVER_DOWN:
-                log.error("LDAP server is down")
-                return RETURN_CODES['EX_TEMPFAIL']
-            except (ldap.NO_SUCH_OBJECT, ValueError):
-                log.info("%r role not found in ldap", role)
-                return RETURN_CODES['EX_NOUSER']
-            except:
-                log.error("%r role not found exception", role)
-                return RETURN_CODES['EX_NOUSER']
-
-            if send_to_owners is True: #Send e-mail to owners
-                for owner_dn, owner_data in role_data['owners_data'].items():
-                    retval = self.send_emails(from_email, owner_data['mail'],
-                                     content)
-                    if retval != RETURN_CODES['EX_OK']: return retval
-                return RETURN_CODES['EX_OK']
-
-            #Check if from_email can expand
-            if self.can_expand(from_email, role, role_data) is False:
-                return RETURN_CODES['EX_NOPERM']
-
-            #Add the necessary headers such as Received and modify the subject
-            #with [role]
-            em = email.message_from_string(content)
-            #Prepend to subject:
-            subject = em.get('subject', '(no-subject)')
-            if not ("[%s] " % role) in subject:
-                subject = "[%s] %s"  % (role, subject)
-                try:
-                    em.replace_header('subject', subject)
-                except KeyError:
-                    em.add_header('subject', subject)
-
-            #Add Sender: header
-            sender = 'owner-' + role_email
-            del em['Sender'] # Exception won't be raised
-            em['Sender'] = sender
-            # List-Post etc. is described in RFC 2369
-            del em['List-Help']
-            del em['List-Subscribe']
-            del em['List-Unsubscribe']
-            del em['List-Owner']
-            # List-ID is described in RFC 2919
-            del em['List-ID']
-            em['List-ID'] = '<%s>' % role_email.replace('@','.')
-            del em['List-Post']
-            em['List-Post'] = '<mailto:%s>' % role_email # Used by Thunderbird and KMail
-
-            content = em.as_string()
-
-            #Split the emails in to batches
-            email_batches = [[]]
-            batch = 0
-            batch_size = 50 #Send in email batches
-
-            for dn, data in role_data['members_data'].iteritems():
-                if len(email_batches[batch]) >= batch_size:
-                    batch += 1
-                    email_batches.append([]) #Init new batch
-                clean_addresses = filter(lambda i: i.find('@')>0, data.get('mail',['']))
-                email_batches[batch].extend(clean_addresses)
-
-            if not debug_mode:
-                self.write_to_archive(from_email, content)
-
-                # If there are any addresses to always send to
-                if self.also_send_to != ['']:
-                    retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
-
-                #Send e-mails
-                for emails in email_batches:
-                    retval = self.send_emails('owner-' + role_email, emails, content)
-                    if retval != RETURN_CODES['EX_OK']: return retval
-                try:
-                    retval = self.send_confirmation_email(subject, from_email, role)
-                except Exception:
-                    log.exception("Error sending confirmation")
-                else:
-                    if retval != RETURN_CODES['EX_OK']:
-                        log.error("Error sending confirmation: %d", retval)
-
-            return RETURN_CODES['EX_OK']
+            role_data = self.agent.get_role(role)
+            assert 'members_data' in role_data, (
+                '`uniqueMember` attribute is missing')
+            # It is perfectly legit to have no owner
+            #assert 'owner' in role_data, (
+            #    '`owner` attribute is missing')
+        except AssertionError:
+            log.exception("In %r role:" % role)
+            return RETURN_CODES['EX_NOUSER']
+        except ldap.SERVER_DOWN:
+            log.error("LDAP server is down")
+            return RETURN_CODES['EX_TEMPFAIL']
+        except (ldap.NO_SUCH_OBJECT, ValueError):
+            log.info("%r role not found in ldap", role)
+            return RETURN_CODES['EX_NOUSER']
         except:
-            log.exception("Internal error")
-            return RETURN_CODES['EX_SOFTWARE']
+            log.error("%r role not found exception", role)
+            return RETURN_CODES['EX_NOUSER']
+
+        if send_to_owners is True: #Send e-mail to owners
+            for owner_dn, owner_data in role_data['owners_data'].items():
+                retval = self.send_emails(from_email, owner_data['mail'],
+                                    content)
+                if retval != RETURN_CODES['EX_OK']: return retval
+            return RETURN_CODES['EX_OK']
+
+        #Check if from_email can expand
+        if self.can_expand(from_email, role, role_data) is False:
+            return RETURN_CODES['EX_NOPERM']
+
+        #Add the necessary headers such as Received and modify the subject
+        #with [role]
+        em = email.message_from_string(content)
+        #Prepend to subject:
+        subject = em.get('subject', '(no-subject)')
+        if not ("[%s] " % role) in subject:
+            subject = "[%s] %s"  % (role, subject)
+            try:
+                em.replace_header('subject', subject)
+            except KeyError:
+                em.add_header('subject', subject)
+
+        #Add Sender: header
+        sender = 'owner-' + role_email
+        del em['Sender'] # Exception won't be raised
+        em['Sender'] = sender
+        # List-Post etc. is described in RFC 2369
+        del em['List-Help']
+        del em['List-Subscribe']
+        del em['List-Unsubscribe']
+        del em['List-Owner']
+        # List-ID is described in RFC 2919
+        del em['List-ID']
+        em['List-ID'] = '<%s>' % role_email.replace('@','.')
+        del em['List-Post']
+        em['List-Post'] = '<mailto:%s>' % role_email # Used by Thunderbird and KMail
+
+        content = em.as_string()
+
+        #Split the emails in to batches
+        email_batches = [[]]
+        batch = 0
+        batch_size = 50 #Send in email batches
+
+        for dn, data in role_data['members_data'].iteritems():
+            if len(email_batches[batch]) >= batch_size:
+                batch += 1
+                email_batches.append([]) #Init new batch
+            clean_addresses = filter(lambda i: i.find('@')>0, data.get('mail',['']))
+            email_batches[batch].extend(clean_addresses)
+
+        if not debug_mode:
+            self.write_to_archive(from_email, content)
+
+            # If there are any addresses to always send to
+            if self.also_send_to != ['']:
+                retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
+
+            #Send e-mails
+            for emails in email_batches:
+                retval = self.send_emails('owner-' + role_email, emails, content)
+                if retval != RETURN_CODES['EX_OK']: return retval
+            try:
+                retval = self.send_confirmation_email(subject, from_email, role)
+            except Exception:
+                log.exception("Error sending confirmation")
+            else:
+                if retval != RETURN_CODES['EX_OK']:
+                    log.error("Error sending confirmation: %d", retval)
+
+        return RETURN_CODES['EX_OK']
 
     def add_inherited_senders(self, role_id, role_data):
         """ Add as permitted senders everyone that inherits
@@ -494,7 +505,6 @@ def usage():
 
 def main():
     #Don't return log to output when in mailer
-    log.removeHandler(stream_handler)
 
     try: #Handle cmd arguments
         opts, args = getopt.getopt(sys.argv[1:], "c:r:f:l:o:t")
@@ -525,6 +535,11 @@ def main():
 
     except KeyError:
         usage()
+
+    if debug_mode:
+        log.setLevel(logging.DEBUG)
+    else:
+        log.removeHandler(stream_handler)
 
     if logfile is not None:
         if logfile == 'syslog':
