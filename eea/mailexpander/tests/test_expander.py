@@ -1,23 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from copy import deepcopy
+from eea.mailexpander.expander import Expander, RETURN_CODES, log
+from mock import Mock
+from test_ldap_agent import StubbedLdapAgent
 import email
 import ldap
 import logging
 import os
+import pytest
 import smtplib
 import unittest
-from copy import deepcopy
-# try:
-#     from email.iterators import body_line_iterator
-# except ImportError: #py2.4
-#     from email.Iterators import body_line_iterator
-from mock import Mock   #, patch    #, wraps
 
-from eea.mailexpander.expander import Expander, RETURN_CODES, log
-from test_ldap_agent import StubbedLdapAgent
 
 log.setLevel(logging.CRITICAL)
+
 
 def ldap_search(dn, scope, ldap_data, **kwargs):
     """ Used to return data from different ldap_data sources """
@@ -25,6 +23,7 @@ def ldap_search(dn, scope, ldap_data, **kwargs):
         if (l_dn, l_scope) == (dn, scope):
             return data
     return []
+
 
 class ExpanderTest(unittest.TestCase):
     def setUp(self):
@@ -101,6 +100,25 @@ class ExpanderTest(unittest.TestCase):
 
         self.mock_conn.search_s.side_effect = ldap_search_called
 
+    def test_error_codes_in_agent(self):
+        no_user = RETURN_CODES['EX_NOUSER']
+        ok = RETURN_CODES['EX_OK']
+        assert self.expander.expand('user_one@example.com', 'test', "") == ok
+        assert self.expander.expand('user_one@example.com', 'test1', "") == \
+            no_user
+
+    def test_simplified_role(self):
+        from eea.mailexpander.expander import SimplifiedRole
+
+        role = SimplifiedRole("eionet-nrc-biodivdata-mc-fr", '')
+        assert role.split() == ['eionet', 'nrc', 'biodivdata', 'mc', 'fr']
+
+        with pytest.raises(ValueError):
+            SimplifiedRole("eionet-etc-biodivdata-mc-fr", "")
+
+        with pytest.raises(ValueError):
+            SimplifiedRole("eionet-nrc-biodivdata-mc-fr-etc", '')
+
     def test_can_expand_by_inheritance(self):
         """ Test if people specified in above hierarchy can expand
         """
@@ -137,9 +155,9 @@ class ExpanderTest(unittest.TestCase):
 
             def _query(self, user_id):
                 data = {
-                    'parent_owner': {'mail':'parent_owner@example.com'},
-                    'top_person': {'mail':'root_parent_person@example.com'},
-                    'member_one': {'mail':'member_one@example.com'}
+                    'parent_owner': {'mail': ['parent_owner@example.com']},
+                    'top_person': {'mail': ['root_parent_person@example.com']},
+                    'member_one': {'mail': ['member_one@example.com']}
                 }
                 return data[user_id]
 
@@ -425,6 +443,7 @@ class ExpanderTest(unittest.TestCase):
                                       'test_empty@roles.eionet.europa.eu',
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -27,7 +27,7 @@ import time
 try:
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-except ImportError, e:
+except ImportError, e:      # pragma: no cover
     from email.MIMEText import MIMEText
     from email.MIMEMultipart import MIMEMultipart
 
@@ -81,7 +81,7 @@ class SimplifiedRole(object):
         if not self.country or (self.type not in ('nfp', 'nrc')):
             raise ValueError("Not a valid NFP/NRC role")
 
-    def split(self, s):
+    def split(self, s='-'):
         return self.role_id.split(s)
 
 
@@ -92,7 +92,7 @@ def log_exceptions(func):
             return func(*args, **kwargs)
         except Exception:
             log.exception("Uncaught exception from %r", func)
-            sys.exit(RETURN_CODES['EX_SOFTWARE'])
+            return RETURN_CODES['EX_SOFTWARE']
 
     return wrapper
 
@@ -287,12 +287,13 @@ class Expander(object):
                                 # Log that we couldn't get the email.
                                 log.exception("Invalid `owner` DN: %s", owner_dn)
                                 continue
+
                             senders.update([x.lower() for x in owner['mail']])
                 elif sender_pattern == 'members':
                     members = role_info.get('members', [])
                     for user_dn in members:
                         user_info = self.agent._query(user_dn)
-                        senders.updated([x.lower() for x in user_info['mail']])
+                        senders.update([x.lower() for x in user_info['mail']])
                 elif '@' in sender_pattern:
                     senders.add(sender_pattern)
 

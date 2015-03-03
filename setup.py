@@ -3,6 +3,8 @@ import sys, os
 
 version = '0.11'
 
+tests_require = ['pytest', 'pytest-cov']
+
 setup(
     name='eea.mailexpander',
     version=version,
@@ -23,4 +25,9 @@ setup(
             'roleexpander = eea.mailexpander.expander:main',
         ]
     },
+    install_requires=[],
+    tests_require=tests_require,
+    extras_require = {
+        'testing': tests_require,
+    }
 )
