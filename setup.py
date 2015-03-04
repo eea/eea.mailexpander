@@ -3,7 +3,7 @@ import sys, os
 
 version = '0.11'
 
-tests_require = ['pytest', 'pytest-cov']
+tests_require = ['pytest', 'pytest-cov', 'mock']
 
 setup(
     name='eea.mailexpander',
