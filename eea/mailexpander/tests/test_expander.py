@@ -444,6 +444,27 @@ class ExpanderTest(unittest.TestCase):
                                       self.fixtures['content_7bit'])
         self.assertEqual(return_code, RETURN_CODES['EX_OK'])
 
+    def test_case_insensitive_sender(self):
+        """ Test case insensitive permited sender, as per #24827
+
+        """
+        self.agent.get_role = Mock(return_value={
+            'description': 'no owner',
+            'members_data': {
+                'uid=userone,ou=Users,o=EIONET,l=Europe': {
+                    'cn': ['User one'],
+                    'mail': ['user_one@example.com'],
+                },
+            },
+            'permittedSender': [
+                'awp2016n2017@email.com'
+            ]
+        })
+        return_code = self.expander.expand('AWP2016n2017@email.com',
+                                      'test_insensitive',
+                                      self.fixtures['content_7bit'])
+        self.assertEqual(return_code, RETURN_CODES['EX_OK'])
+
 
 if __name__ == '__main__':
     unittest.main()
