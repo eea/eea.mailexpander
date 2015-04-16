@@ -26,7 +26,7 @@ import time
 try:
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-except ImportError, e:      # pragma: no cover
+except ImportError as e:      # pragma: no cover
     from email.MIMEText import MIMEText
     from email.MIMEMultipart import MIMEMultipart
 
