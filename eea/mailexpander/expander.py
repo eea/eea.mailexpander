@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = """$Id$"""
-
-
 from ConfigParser import ConfigParser
 from fnmatch import fnmatch
 from ldap_agent import LdapAgent
@@ -21,6 +18,8 @@ import smtplib
 import string
 import sys
 import time
+
+__version__ = """$Id$"""
 
 
 try:
@@ -285,6 +284,9 @@ class Expander(object):
 
         for parent_role_dn in parent_roles:
             role_info = self.agent._role_info(parent_role_dn)
+
+            if 'permittedSender' not in role_info:
+                continue
 
             for sender_pattern in role_info['permittedSender']:
                 sender_pattern = sender_pattern.lower()

@@ -1,3 +1,8 @@
+0.11 (2016-10-04)
+======================
+* Bug fix: don't fail when permittedSender is missing from role info
+  [tiberich #77456 ]
+
 0.10 (2014-09-24)
 ======================
 * Bug fix: fix bug in expanding with permitted sender email
