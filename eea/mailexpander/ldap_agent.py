@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-__version__ = """$Id$"""
-
 from string import ascii_lowercase
-import ldap, ldap.filter
+import ldap
+import ldap.filter
 import re
+
+__version__ = """$Id: ldap_agent.py 40732 2017-01-25 11:20:56Z tiberich $"""
 
 
 class LdapAgent(object):
@@ -70,7 +71,7 @@ class LdapAgent(object):
     def _user_id(self, user_dn):
         assert user_dn.endswith(',' + self._user_dn_suffix)
         assert user_dn.startswith('uid=')
-        user_id = user_dn[len('uid=') : - (len(self._user_dn_suffix) + 1)]
+        user_id = user_dn[len('uid='): -(len(self._user_dn_suffix) + 1)]
         assert ',' not in user_id
         return user_id
 
@@ -107,11 +108,14 @@ class LdapAgent(object):
 
         def get_data(data, key, target_attr):
             return_attr = {}
-            if data.has_key(key):
+            if key in data:
                 for dn in data[key]:
-                    if dn == '': continue #Ignore empty DN attributes
-                    try: return_attr[dn] = self._query(dn)
-                    except: pass # Ignore members that don't exist in ldap any longer
+                    if dn == '':
+                        continue    # Ignore empty DN attributes
+                    try:
+                        return_attr[dn] = self._query(dn)
+                    except:
+                        pass    # Ignore members that no longer exist in ldap
             return {target_attr: return_attr}
 
         attr.update(get_data(attr, 'uniqueMember', 'members_data'))

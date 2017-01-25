@@ -1,3 +1,8 @@
+0.12 (2017-01-25)
+======================
+* Feature: use a fallback email when there's a group with no owner email
+  [tiberich #77456 ]
+
 0.11 (2016-10-04)
 ======================
 * Bug fix: don't fail when permittedSender is missing from role info

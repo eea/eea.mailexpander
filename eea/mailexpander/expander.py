@@ -19,7 +19,7 @@ import string
 import sys
 import time
 
-__version__ = """$Id$"""
+__version__ = """$Id: expander.py 40732 2017-01-25 11:20:56Z tiberich $"""
 
 
 try:
@@ -42,22 +42,22 @@ except ImportError:
 
 
 RETURN_CODES = {
-   'EX_OK':           0,  # successful termination
-   'EX_USAGE':        64, # command line usage error
-   'EX_DATAERR':      65, # data format error
-   'EX_NOINPUT':      66, # cannot open input
-   'EX_NOUSER':       67, # addressee unknown
-   'EX_NOHOST':       68, # host name unknown
-   'EX_UNAVAILABLE':  69, # service unavailable
-   'EX_SOFTWARE':     70, # internal software error
-   'EX_OSERR':        71, # system error (e.g., can't fork)
-   'EX_OSFILE':       72, # critical OS file missing
-   'EX_CANTCREAT':    73, # can't create (user) output file
-   'EX_IOERR':        74, # input/output error
-   'EX_TEMPFAIL':     75, # temp failure; user is invited to retry
-   'EX_PROTOCOL':     76, # remote error in protocol
-   'EX_NOPERM':       77, # permission denied
-   'EX_CONFIG':       78, # configuration error
+    'EX_OK':           0,   # successful termination
+    'EX_USAGE':        64,  # command line usage error
+    'EX_DATAERR':      65,  # data format error
+    'EX_NOINPUT':      66,  # cannot open input
+    'EX_NOUSER':       67,  # addressee unknown
+    'EX_NOHOST':       68,  # host name unknown
+    'EX_UNAVAILABLE':  69,  # service unavailable
+    'EX_SOFTWARE':     70,  # internal software error
+    'EX_OSERR':        71,  # system error (e.g., can't fork)
+    'EX_OSFILE':       72,  # critical OS file missing
+    'EX_CANTCREAT':    73,  # can't create (user) output file
+    'EX_IOERR':        74,  # input/output error
+    'EX_TEMPFAIL':     75,  # temp failure; user is invited to retry
+    'EX_PROTOCOL':     76,  # remote error in protocol
+    'EX_NOPERM':       77,  # permission denied
+    'EX_CONFIG':       78,  # configuration error
 }
 
 
@@ -119,15 +119,15 @@ class Expander(object):
         also_string = config.get('also_send_to', '')
         self.also_send_to = map(string.strip, also_string.split(','))
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
+        self.no_owner_send_to = config.get('no_owner_send_to', '')
 
     def _get_nfp_roles(self, uid):
         out = []
         filterstr = ("(&(objectClass=groupOfUniqueNames)(uniqueMember=%s))" %
-                    self.agent._user_dn(uid))
-        nfp_roles = self.agent.filter_roles("eionet-nfp-*-*",
-                                    prefix_dn="cn=eionet-nfp,cn=eionet",
-                                    filterstr=filterstr,
-                                    attrlist=("description",))
+                     self.agent._user_dn(uid))
+        nfp_roles = self.agent.filter_roles(
+            "eionet-nfp-*-*", prefix_dn="cn=eionet-nfp,cn=eionet",
+            filterstr=filterstr, attrlist=("description",))
 
         for nfp in nfp_roles:
             try:
@@ -157,7 +157,7 @@ class Expander(object):
         Arguments::
 
             from_email -- Sender e-mail (as received from sendmail)
-            role_email -- A pseudo address (Ex: ldap-role@roles.eionet.europa.eu)
+            role_email -- A pseudo address (ldap-role@roles.eionet.europa.eu)
             content -- E-mail headers and body
 
         """
@@ -179,7 +179,7 @@ class Expander(object):
             assert 'members_data' in role_data, (
                 '`uniqueMember` attribute is missing')
             # It is perfectly legit to have no owner
-            #assert 'owner' in role_data, (
+            # assert 'owner' in role_data, (
             #    '`owner` attribute is missing')
         except AssertionError:
             log.exception("In %r role:" % role)
@@ -194,33 +194,42 @@ class Expander(object):
             log.error("%r role not found exception", role)
             return RETURN_CODES['EX_NOUSER']
 
-        if send_to_owners is True: #Send e-mail to owners
-            for owner_dn, owner_data in role_data['owners_data'].items():
+        if send_to_owners is True:  # Send e-mail to owners
+            owners = role_data['owners_data']
+            for owner_dn, owner_data in owners.items():
                 retval = self.send_emails(from_email, owner_data['mail'],
                                           content)
                 if retval != RETURN_CODES['EX_OK']:
                     return retval
+            if not owners:
+                log.info("No owner found, sending to %s",
+                         self.no_owner_send_to)
+                if not debug_mode:
+                    retval = self.send_emails(from_email,
+                                              self.no_owner_send_to, content)
+                    if retval != RETURN_CODES['EX_OK']:
+                        return retval
             return RETURN_CODES['EX_OK']
 
-        #Check if from_email can expand
+        # Check if from_email can expand
         if self.can_expand(from_email, role, role_data) is False:
             return RETURN_CODES['EX_NOPERM']
 
-        #Add the necessary headers such as Received and modify the subject
-        #with [role]
+        # Add the necessary headers such as Received and modify the subject
+        # with [role]
         em = email.message_from_string(content)
-        #Prepend to subject:
+        # Prepend to subject:
         subject = em.get('subject', '(no-subject)')
         if not ("[%s] " % role) in subject:
-            subject = "[%s] %s"  % (role, subject)
+            subject = "[%s] %s" % (role, subject)
             try:
                 em.replace_header('subject', subject)
             except KeyError:
                 em.add_header('subject', subject)
 
-        #Add Sender: header
+        # Add Sender: header
         sender = 'owner-' + role_email
-        del em['Sender'] # Exception won't be raised
+        del em['Sender']  # Exception won't be raised
         em['Sender'] = sender
         # List-Post etc. is described in RFC 2369
         del em['List-Help']
@@ -229,22 +238,24 @@ class Expander(object):
         del em['List-Owner']
         # List-ID is described in RFC 2919
         del em['List-ID']
-        em['List-ID'] = '<%s>' % role_email.replace('@','.')
+        em['List-ID'] = '<%s>' % role_email.replace('@', '.')
         del em['List-Post']
-        em['List-Post'] = '<mailto:%s>' % role_email # Used by Thunderbird and KMail
+        # Used by Thunderbird and KMail
+        em['List-Post'] = '<mailto:%s>' % role_email
 
         content = em.as_string()
 
-        #Split the emails in to batches
+        # Split the emails in to batches
         email_batches = [[]]
         batch = 0
-        batch_size = 50 #Send in email batches
+        batch_size = 50  # Send in email batches
 
         for dn, data in role_data['members_data'].iteritems():
             if len(email_batches[batch]) >= batch_size:
                 batch += 1
-                email_batches.append([]) #Init new batch
-            clean_addresses = filter(lambda i: i.find('@')>0, data.get('mail',['']))
+                email_batches.append([])  # Init new batch
+            clean_addresses = filter(lambda i: i.find(
+                '@') > 0, data.get('mail', ['']))
             email_batches[batch].extend(clean_addresses)
 
         if not debug_mode:
@@ -252,14 +263,18 @@ class Expander(object):
 
             # If there are any addresses to always send to
             if self.also_send_to != ['']:
-                retval = self.send_emails('owner-' + role_email, self.also_send_to, content)
+                retval = self.send_emails(
+                    'owner-' + role_email, self.also_send_to, content)
 
-            #Send e-mails
+            # Send e-mails
             for emails in email_batches:
-                retval = self.send_emails('owner-' + role_email, emails, content)
-                if retval != RETURN_CODES['EX_OK']: return retval
+                retval = self.send_emails(
+                    'owner-' + role_email, emails, content)
+                if retval != RETURN_CODES['EX_OK']:
+                    return retval
             try:
-                retval = self.send_confirmation_email(subject, from_email, role)
+                retval = self.send_confirmation_email(
+                    subject, from_email, role)
             except Exception:
                 log.exception("Error sending confirmation")
             else:
@@ -275,7 +290,7 @@ class Expander(object):
         # this allows "inheriting" permissions from above roles
         # see http://taskman.eionet.europa.eu/issues/20422
 
-        if not 'permittedPerson' in role_data:
+        if 'permittedPerson' not in role_data:
             role_data['permittedPerson'] = []
 
         role_dn = self.agent._role_dn(role_id)
@@ -297,7 +312,8 @@ class Expander(object):
                                 owner = self.agent._query(owner_dn)
                             except:
                                 # Log that we couldn't get the email.
-                                log.exception("Invalid `owner` DN: %s", owner_dn)
+                                log.exception(
+                                    "Invalid `owner` DN: %s", owner_dn)
                                 continue
 
                             senders.update([x.lower() for x in owner['mail']])
@@ -332,11 +348,11 @@ class Expander(object):
         * Looking at the permittedSender value:
 
         permittedSender -- Possible values:
-                            - 'anyone' (All senders are accepted)
-                            - 'members' (All `uniqueMember` attributes),
-                            - 'owners' (All `owner` attributes),
-                            - *@domain.com, admin.*@domain.com (fnmatch patters)
-                            - alex@domain.com (simple email addresses)
+                        - 'anyone' (All senders are accepted)
+                        - 'members' (All `uniqueMember` attributes),
+                        - 'owners' (All `owner` attributes),
+                        - *@domain.com, admin.*@domain.com (fnmatch patters)
+                        - alex@domain.com (simple email addresses)
 
         This takes into account everything from parent levels, too, per
         http://taskman.eionet.europa.eu/issues/20422
@@ -353,13 +369,14 @@ class Expander(object):
         role_data = self.add_inherited_senders(role_id=role,
                                                role_data=role_data)
 
-        #Convert to lower in case of mixed-case e-mail addresses
+        # Convert to lower in case of mixed-case e-mail addresses
         from_email = from_email.lower()
 
         # Fix for #18085;
         # Treat the case where the email address contains the = character.
         # the eionet accounts only use "clean" emails
-        ident, host = from_email.split('@') # assume a single @ inside email address
+        # assume a single @ inside email address
+        ident, host = from_email.split('@')
         name = ident.split('=')[-1]
         from_email = "@".join((name, host))
 
@@ -375,14 +392,17 @@ class Expander(object):
                                 owner = self.agent._query(owner_dn)
                             except:
                                 # Log that we couldn't get the email.
-                                log.exception("Invalid `owner` DN: %s", owner_dn)
+                                log.exception(
+                                    "Invalid `owner` DN: %s", owner_dn)
                                 continue
                             if from_email in map(str.lower, owner['mail']):
                                 return True
                 elif sender_pattern == 'members':
                     if 'members_data' in role_data:
-                        for user_dn, user_attrs in role_data['members_data'].iteritems():
-                            if from_email in map(str.lower, user_attrs['mail']):
+                        for user_dn, user_attrs in \
+                                role_data['members_data'].iteritems():
+                            if from_email in \
+                                    map(str.lower, user_attrs['mail']):
                                 return True
                 elif fnmatch(from_email, sender_pattern):
                     return True
@@ -433,10 +453,10 @@ class Expander(object):
     def get_nfp_roles_for_country(self, country_code):
         out = []
         filterstr = "(objectClass=groupOfUniqueNames)"
-        nfp_roles = self.agent.filter_roles("eionet-nfp-*-%s" % country_code,
-                                            prefix_dn="cn=eionet-nfp,cn=eionet",
-                                            filterstr=filterstr,
-                                            attrlist=("description",))
+        nfp_roles = self.agent.filter_roles(
+            "eionet-nfp-*-%s" % country_code,
+            prefix_dn="cn=eionet-nfp,cn=eionet", filterstr=filterstr,
+            attrlist=("description",))
 
         for nfp in nfp_roles:
             out.append(nfp[0])
@@ -474,8 +494,8 @@ class Expander(object):
                 log.debug('Confirmation email sent to %s', to_email)
             except smtplib.SMTPException:
                 log.exception("SMTP Error")
-                log.error("Failed to send confirmation email using smtplib to %s",
-                          to_email)
+                log.error("Failed to send confirmation email "
+                          "using smtplib to %s", to_email)
                 return RETURN_CODES['EX_PROTOCOL']
             except:
                 log.exception("Unknown smtplib error")
@@ -492,23 +512,28 @@ class Expander(object):
         """ Use /usr/bin/sendmail or fallback to smtplib.
 
         """
-        if len(emails) == 0: # Nobody to send to - it happens
+        if len(emails) == 0:  # Nobody to send to - it happens
             return RETURN_CODES['EX_OK']
         try:
             # This should be secure check:
             # http://docs.python.org/library/subprocess.html#using-the-subprocess-module
-            # It turns out that sendmail splits the addresses on space, eventhough
-            # there is one address per argument. See RFC5322 section 3.4
-            # Try: /usr/sbin/sendmail 'soren.roug @eea.europa.eu' and it will complain
-            # about the address. We therefore clean them with smtplib.quoteaddr
+            # It turns out that sendmail splits the addresses on space,
+            # eventhough there is one address per argument. See RFC5322 section
+            # 3.4 Try: /usr/sbin/sendmail 'soren.roug @eea.europa.eu' and it
+            # will complain about the address. We therefore clean them with
+            # smtplib.quoteaddr
             quotedemails = map(smtplib.quoteaddr, emails)
-            ps = Popen([self.sendmail_path, '-f', smtplib.quoteaddr(from_email), '--'] + quotedemails,
-                                                                    stdin=PIPE)
+            ps = Popen([self.sendmail_path,
+                        '-f',
+                        smtplib.quoteaddr(from_email),
+                        '--'] + quotedemails,
+                       stdin=PIPE)
             ps.stdin.write(content)
             ps.stdin.flush()
             ps.stdin.close()
             return_code = ps.wait()
-            if return_code in (RETURN_CODES['EX_OK'], RETURN_CODES['EX_TEMPFAIL']):
+            if return_code in (RETURN_CODES['EX_OK'],
+                               RETURN_CODES['EX_TEMPFAIL']):
                 log.debug("Sent emails to %r", emails)
                 return RETURN_CODES['EX_OK']
             else:
@@ -516,12 +541,13 @@ class Expander(object):
                           "/usr/sbin/sendmail exited with code %d", emails,
                           return_code)
             return return_code
-        except OSError: #fallback to smtplib
+        except OSError:  # fallback to smtplib
             # Since this is the same mailer we use localhost
             # Smtplib quotes the addresses internally
             log.exception("Cannot use sendmail program. Falling back to "
                           "smtplib.")
-            log.warning("If the smtp connection fails some emails will be lost")
+            log.warning(
+                "If the smtp connection fails some emails will be lost")
             smtp = smtplib.SMTP('localhost')
             try:
                 try:
@@ -529,7 +555,8 @@ class Expander(object):
                     log.debug("Sent emails to %r", emails)
                 except smtplib.SMTPException:
                     log.exception("SMTP Error")
-                    log.error("Failed to send emails using smtplib to %r", emails)
+                    log.error(
+                        "Failed to send emails using smtplib to %r", emails)
                     return RETURN_CODES['EX_PROTOCOL']
                 except:
                     log.exception("Unknown smtplib error")
@@ -547,21 +574,24 @@ class Expander(object):
         It is more important that we send the email than we save the message
         """
         if self.archivefile is None:
-            return # No mailbox to write to
-        mboxfd = open(self.archivefile,'ab')
+            return  # No mailbox to write to
+        mboxfd = open(self.archivefile, 'ab')
         try:
-            fcntl.lockf(mboxfd, fcntl.LOCK_EX | fcntl.LOCK_NB) # Get an exclusive lock - don't block
+            # Get an exclusive lock - don't block
+            fcntl.lockf(mboxfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             # We could try 10 times and sleep one second between each try
             # if we get an EAGAIN or EACCES error
             # except IOError, e:
             #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
         except:
-            log.error("Unable to acquire exclusive lock on %s" % self.archivefile)
+            log.error("Unable to acquire exclusive lock on %s" %
+                      self.archivefile)
             return
         mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
         mboxfd.write(content)
         mboxfd.write('\n')
-        fcntl.lockf(mboxfd, fcntl.LOCK_UN) # Not really necessary - we close it
+        # Not really necessary - we close it
+        fcntl.lockf(mboxfd, fcntl.LOCK_UN)
         mboxfd.close()
 
 
@@ -569,21 +599,21 @@ def usage():
     print ("%s [-t] -r [to-email] -f [from-email] -c [config-file] "
            "-l [ldap-host] -o [logfile]") % sys.argv[0]
     # You can't log when you have just removed the log handler
-    #log.error("Invalid arguments %r" % sys.argv)
+    # log.error("Invalid arguments %r" % sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
 
 
 def main():
-    #Don't return log to output when in mailer
+    # Don't return log to output when in mailer
 
-    try: #Handle cmd arguments
+    try:  # Handle cmd arguments
         opts, args = getopt.getopt(sys.argv[1:], "c:r:f:l:o:t")
     except getopt.GetoptError:
         usage()
 
     logfile = None
     ldap_config = {}
-    #sendmail_path = ''
+    # sendmail_path = ''
     debug_mode = False
     expander_config = {}
     try:
@@ -614,18 +644,21 @@ def main():
     if logfile is not None:
         if logfile == 'syslog':
             log_handler = SysLogHandler('/dev/log', SysLogHandler.LOG_MAIL)
-            formatter = logging.Formatter("%(name)s: %(levelname)s - %(message)s")
+            formatter = logging.Formatter(
+                "%(name)s: %(levelname)s - %(message)s")
             log_handler.setFormatter(formatter)
         else:
             log_handler = logging.FileHandler(logfile, 'a')
-            formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            formatter = logging.Formatter(
+                "%(asctime)s - %(levelname)s - %(message)s")
             log_handler.setFormatter(formatter)
         log.setLevel(logging.INFO)
         log.addHandler(log_handler)
 
     log.debug("=========== starting rolesmailer ============")
     try:
-        #Message body + headers come from raw_input. Make sure they stay untouched
+        # Message body + headers come from raw_input. Make sure they stay
+        # untouched
         content = ""
         if not debug_mode:
             while True:
@@ -634,7 +667,7 @@ def main():
                     break
                 content += buffer
 
-        #Open connection with the ldap
+        # Open connection with the ldap
         try:
             agent = LdapAgent(**ldap_config)
         except:
