@@ -1,0 +1,13 @@
+*~
+*.pyc
+bin/*
+htmlcov/*
+include/*
+lib/*
+*.diff
+pip-selfcheck.json
+share/*
+*.orig
+*.rej
+\.*
+*egg-info/
