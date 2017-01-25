@@ -19,7 +19,7 @@ import string
 import sys
 import time
 
-__version__ = """$Id: expander.py 40732 2017-01-25 11:20:56Z tiberich $"""
+__version__ = """$Id: expander.py 40735 2017-01-25 12:14:21Z tiberich $"""
 
 
 try:
@@ -206,7 +206,7 @@ class Expander(object):
                          self.no_owner_send_to)
                 if not debug_mode:
                     retval = self.send_emails(from_email,
-                                              self.no_owner_send_to, content)
+                                              [self.no_owner_send_to], content)
                     if retval != RETURN_CODES['EX_OK']:
                         return retval
             return RETURN_CODES['EX_OK']
