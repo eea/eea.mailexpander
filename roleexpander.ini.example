@@ -1,0 +1,20 @@
+[expander]
+sendmail_path: /usr/sbin/sendmail
+
+; or absolute path to log file
+log: syslog
+
+;Mailbox format
+mailbox: /tmp/mailbox/
+
+;no-reply email address
+no-reply: no-reply@eea.europa.eu
+no_owner_send_to: someone@example.com
+
+[ldap]
+ldap_server: ldap.eionet.europa.eu:389
+users_dn: ou=Users,o=EIONET,l=Europe
+roles_dn: ou=Roles,o=EIONET,l=Europe
+encoding: utf-8
+user_dn: cn=Accounts Browser,o=EIONET,l=Europe
+user_pw:
