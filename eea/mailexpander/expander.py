@@ -19,7 +19,7 @@ import string
 import sys
 import time
 
-__version__ = """$Id: expander.py 40735 2017-01-25 12:14:21Z tiberich $"""
+__version__ = """$Id: expander.py 40736 2017-01-25 14:14:41Z tiberich $"""
 
 
 try:
@@ -119,7 +119,7 @@ class Expander(object):
         also_string = config.get('also_send_to', '')
         self.also_send_to = map(string.strip, also_string.split(','))
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
-        self.no_owner_send_to = config.get('no_owner_send_to', '')
+        self.no_owner_send_to = config.get('no_owner_send_to', '').strip()
 
     def _get_nfp_roles(self, uid):
         out = []
@@ -205,10 +205,13 @@ class Expander(object):
                 log.info("No owner found, sending to %s",
                          self.no_owner_send_to)
                 if not debug_mode:
-                    retval = self.send_emails(from_email,
-                                              [self.no_owner_send_to], content)
-                    if retval != RETURN_CODES['EX_OK']:
-                        return retval
+                    if self.no_owner_send_to:
+                        retval = self.send_emails(
+                            from_email, [self.no_owner_send_to], content)
+                        if retval != RETURN_CODES['EX_OK']:
+                            return retval
+                    else:
+                        return RETURN_CODES['EX_CONFIG']
             return RETURN_CODES['EX_OK']
 
         # Check if from_email can expand

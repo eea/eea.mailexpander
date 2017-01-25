@@ -33,7 +33,6 @@ class ExpanderTest(unittest.TestCase):
 
         self.expander = Expander(self.agent)
         self.expander.send_emails = Mock(return_value=RETURN_CODES['EX_OK'])
-        self.expander.no_owner_send_to = 'test@example.com'
 
         # Load fixtures from ./fixtures directory into dictionary with keys as
         # filenames without extentions
@@ -260,10 +259,19 @@ class ExpanderTest(unittest.TestCase):
     def test_send_to_fallback_owner(self):
         from_email = 'user_one@example.com'
         role_email = 'owner-unowned@roles.eionet.europa.eu'
+        self.expander.no_owner_send_to = 'test@example.com'
         self.expander.expand(from_email, role_email,
                              self.fixtures['content_7bit'])
         self.assertEquals(self.expander.send_emails.call_args[0][1],
                           ['test@example.com'])
+        del self.expander.no_owner_send_to
+
+    def test_send_to_fallback_owner_missing_config(self):
+        from_email = 'user_one@example.com'
+        role_email = 'owner-unowned@roles.eionet.europa.eu'
+        res = self.expander.expand(from_email, role_email,
+                                   self.fixtures['content_7bit'])
+        self.assertEquals(res, RETURN_CODES['EX_CONFIG'])
 
     def test_smtp_failure(self):
         """ SMTP Failure test """
