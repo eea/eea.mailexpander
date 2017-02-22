@@ -5,7 +5,7 @@ import ldap
 import ldap.filter
 import re
 
-__version__ = """$Id: ldap_agent.py 40732 2017-01-25 11:20:56Z tiberich $"""
+__version__ = """$Id: ldap_agent.py 40786 2017-02-22 15:32:09Z tiberich $"""
 
 
 class LdapAgent(object):
@@ -15,6 +15,8 @@ class LdapAgent(object):
             self.ldap_server = 'ldap://' + self.ldap_server
         self.conn = self.connect()
         self.conn.protocol_version = ldap.VERSION3
+        self.conn.simple_bind_s(config['user_dn'].strip(),
+                                config['user_pw'].strip())
         self._encoding = config.get('encoding', 'utf-8')
         self._user_dn_suffix = config.get('users_dn',
                                           "ou=Users,o=EIONET,l=Europe")
