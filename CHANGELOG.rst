@@ -1,3 +1,9 @@
+0.13 (2017-04-03)
+======================
+* Bug fix: use log.exception instead of log.error when handling an unknown
+  error
+  [tiberich #83622]
+
 0.12 (2017-01-25)
 ======================
 * Feature: use a fallback email when there's a group with no owner email

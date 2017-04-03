@@ -19,7 +19,7 @@ import string
 import sys
 import time
 
-__version__ = """$Id: expander.py 40736 2017-01-25 14:14:41Z tiberich $"""
+__version__ = """$Id: expander.py 40877 2017-04-03 10:40:09Z tiberich $"""
 
 
 try:
@@ -680,7 +680,7 @@ def main():
         expander = Expander(agent, **expander_config)
         return expander.expand(from_email, role_email, content, debug_mode)
     except:
-        log.error("Unexpected error")
+        log.exception("Unexpected error")
         return RETURN_CODES['EX_SOFTWARE']
 
 
