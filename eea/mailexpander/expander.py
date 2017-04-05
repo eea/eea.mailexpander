@@ -646,7 +646,8 @@ def main():
 
     if logfile is not None:
         if logfile == 'syslog':
-            log_handler = SysLogHandler('/dev/log', SysLogHandler.LOG_MAIL)
+            log_handler = SysLogHandler('/dev/log',
+                                        facility=SysLogHandler.LOG_LOCAL6)
             formatter = logging.Formatter(
                 "%(name)s: %(levelname)s - %(message)s")
             log_handler.setFormatter(formatter)
