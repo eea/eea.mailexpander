@@ -7,7 +7,7 @@ URL="https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.11.4.tar.
 
 curl $URL > /tmp/virtualenv.tgz
 tar xzf /tmp/virtualenv.tgz -C ./
-/usr/bin/python2 $VENV --clear --system-site-packages ./
+/usr/bin/python2.7 $VENV --clear --system-site-packages ./
 
 bin/pip install -e .
 bin/pip install eea.mailexpander[testing]

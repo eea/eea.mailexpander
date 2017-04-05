@@ -19,7 +19,7 @@ import string
 import sys
 import time
 
-__version__ = """$Id: expander.py 40877 2017-04-03 10:40:09Z tiberich $"""
+__version__ = """$Id: expander.py 40888 2017-04-05 09:47:09Z tiberich $"""
 
 
 try:
