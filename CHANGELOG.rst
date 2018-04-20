@@ -1,3 +1,8 @@
+0.14 (unreleased)
+======================
+* ldaps is now the default connection type
+  [valipod #94809]
+
 0.13 (2017-04-03)
 ======================
 * Bug fix: use log.exception instead of log.error when handling an unknown

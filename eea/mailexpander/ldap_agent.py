@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-
 from string import ascii_lowercase
 import ldap
 import ldap.filter
 import re
 
-__version__ = """$Id: ldap_agent.py 40786 2017-02-22 15:32:09Z tiberich $"""
+__version__ = """$Id$"""
 
 
 class LdapAgent(object):
     def __init__(self, **config):
         self.ldap_server = config['ldap_server']
-        if self.ldap_server[:7] != 'ldap://':
-            self.ldap_server = 'ldap://' + self.ldap_server
+        if not (self.ldap_server.startswith('ldap://') or
+                self.ldap_server.startswith('ldaps://')):
+            self.ldap_server = 'ldaps://' + self.ldap_server
         self.conn = self.connect()
         self.conn.protocol_version = ldap.VERSION3
         self.conn.simple_bind_s(config['user_dn'].strip(),
@@ -73,7 +73,7 @@ class LdapAgent(object):
     def _user_id(self, user_dn):
         assert user_dn.endswith(',' + self._user_dn_suffix)
         assert user_dn.startswith('uid=')
-        user_id = user_dn[len('uid='): -(len(self._user_dn_suffix) + 1)]
+        user_id = user_dn[len('uid='): - (len(self._user_dn_suffix) + 1)]
         assert ',' not in user_id
         return user_id
 
@@ -113,11 +113,11 @@ class LdapAgent(object):
             if key in data:
                 for dn in data[key]:
                     if dn == '':
-                        continue    # Ignore empty DN attributes
+                        continue  # Ignore empty DN attributes
                     try:
                         return_attr[dn] = self._query(dn)
                     except:
-                        pass    # Ignore members that no longer exist in ldap
+                        pass  # Ignore members that don't exist in ldap anymore
             return {target_attr: return_attr}
 
         attr.update(get_data(attr, 'uniqueMember', 'members_data'))
