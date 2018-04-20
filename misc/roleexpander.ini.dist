@@ -11,7 +11,7 @@ mailbox: /tmp/mailbox/
 no-reply: no-reply@eea.europa.eu
 
 [ldap]
-ldap_server: localhost:389
+ldap_server: ldaps://localhost:636
 users_dn: ou=Users,o=EIONET,l=Europe
 roles_dn: ou=Roles,o=EIONET,l=Europe
 encoding: utf-8

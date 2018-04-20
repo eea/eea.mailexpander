@@ -12,7 +12,7 @@ no-reply: no-reply@eea.europa.eu
 no_owner_send_to: someone@example.com
 
 [ldap]
-ldap_server: ldap.eionet.europa.eu:389
+ldap_server: ldaps://ldap.eionet.europa.eu:636
 users_dn: ou=Users,o=EIONET,l=Europe
 roles_dn: ou=Roles,o=EIONET,l=Europe
 encoding: utf-8
