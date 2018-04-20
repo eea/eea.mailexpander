@@ -1,7 +1,7 @@
-from setuptools import setup, find_packages
-import sys, os
+from setuptools import setup
+from setuptools import find_packages
 
-version = '0.13'
+version = '0.14'
 
 tests_require = ['pytest', 'pytest-cov', 'mock']
 
@@ -11,7 +11,8 @@ setup(
     description="Sendmail mailer with some LDAP checking",
     long_description="""This program acts as a sendmail mailer and allows
     sending mails to a certain ldap group (role).""",
-    classifiers=[], # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
+    # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
+    classifiers=[],
     keywords='python ldap sendmail',
     author='Eau de Web',
     author_email='office@eaudeweb.ro',
@@ -27,7 +28,7 @@ setup(
     },
     install_requires=[],
     tests_require=tests_require,
-    extras_require = {
+    extras_require={
         'testing': tests_require,
     }
 )

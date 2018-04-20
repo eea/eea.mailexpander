@@ -1,4 +1,7 @@
-0.14 (unreleased)
+0.15 (unreleased)
+======================
+
+0.14 (2018-04-20)
 ======================
 * ldaps is now the default connection type
   [valipod #94809]
