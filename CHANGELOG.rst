@@ -1,4 +1,7 @@
-0.15 (unreleased)
+0.16 (unreleased)
+======================
+
+0.15 (2018-04-23)
 ======================
 * updated ini example files to use ldaps [dumitval]
 
