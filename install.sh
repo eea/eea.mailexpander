@@ -2,8 +2,8 @@
 
 rm -rf bin/ lib/ lib64/ local/ include/ build/ dist/ htmlcov/
 
-VENV=virtualenv-1.11.4/virtualenv.py
-URL="https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.11.4.tar.gz#md5=9accc2d3f0ec1da479ce2c3d1fdff06e"
+VENV=virtualenv-15.2.0/virtualenv.py
+URL="https://files.pythonhosted.org/packages/b1/72/2d70c5a1de409ceb3a27ff2ec007ecdd5cc52239e7c74990e32af57affe9/virtualenv-15.2.0.tar.gz"
 
 curl $URL > /tmp/virtualenv.tgz
 tar xzf /tmp/virtualenv.tgz -C ./
