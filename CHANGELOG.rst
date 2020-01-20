@@ -1,5 +1,6 @@
 0.16 (unreleased)
 ======================
+* allow filtering of role members [dumitval]
 
 0.15 (2018-04-23)
 ======================

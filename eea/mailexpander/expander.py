@@ -120,6 +120,7 @@ class Expander(object):
         self.also_send_to = map(string.strip, also_string.split(','))
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
         self.no_owner_send_to = config.get('no_owner_send_to', '').strip()
+        self.filter_str = config.get('filter_str', '').strip()
 
     def _get_nfp_roles(self, uid):
         out = []
@@ -254,6 +255,16 @@ class Expander(object):
         batch_size = 50  # Send in email batches
 
         for dn, data in role_data['members_data'].iteritems():
+            if self.filter_str not in role:
+                filter_out = False
+                member_roles = self.agent.roles_with_member(dn)
+                for member_role in member_roles:
+                    if self.filter_str in member_role:
+                        log.info('filtered out %s' % dn)
+                        filter_out = True
+                        break
+                if filter_out:
+                    continue
             if len(email_batches[batch]) >= batch_size:
                 batch += 1
                 email_batches.append([])  # Init new batch

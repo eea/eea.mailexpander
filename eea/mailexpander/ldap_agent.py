@@ -198,3 +198,16 @@ class LdapAgent(object):
             current_bit = bit
 
         return current_bit
+
+    def roles_with_member(self, member_dn):
+        """
+        Returns roles of member
+
+        """
+        role_dn = self._role_dn_suffix
+        filter_tmpl = '(&(objectClass=groupOfUniqueNames)(uniqueMember=%s))'
+        filterstr = ldap.filter.filter_format(filter_tmpl, (member_dn,))
+        result = self.conn.search_s(role_dn, ldap.SCOPE_SUBTREE,
+                                    filterstr=filterstr, attrlist=())
+        for dn, attr in result:
+            yield dn

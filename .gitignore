@@ -11,3 +11,5 @@ share/*
 *.rej
 \.*
 *egg-info/
+roleexpander.ini
+local/

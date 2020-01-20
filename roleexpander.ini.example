@@ -11,6 +11,9 @@ mailbox: /tmp/mailbox/
 no-reply: no-reply@eea.europa.eu
 no_owner_send_to: someone@example.com
 
+# roles containing this string will be skipped if not sent to directly
+filter_str: -gb
+
 [ldap]
 ldap_server: ldaps://ldap.eionet.europa.eu:636
 users_dn: ou=Users,o=EIONET,l=Europe
