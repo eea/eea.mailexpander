@@ -201,7 +201,7 @@ class LdapAgent(object):
 
     def roles_with_member(self, member_dn):
         """
-        Returns roles of member
+        Returns roles of a user
 
         """
         role_dn = self._role_dn_suffix

@@ -255,6 +255,9 @@ class Expander(object):
         batch_size = 50  # Send in email batches
 
         for dn, data in role_data['members_data'].iteritems():
+            # if there is a filter and the mail was not sent directly to
+            # a role matching the filter, remove all users from subroles
+            # mathching that filter
             if self.filter_str not in role:
                 filter_out = False
                 member_roles = self.agent.roles_with_member(dn)
