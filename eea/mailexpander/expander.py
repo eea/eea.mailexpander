@@ -121,6 +121,8 @@ class Expander(object):
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
         self.no_owner_send_to = config.get('no_owner_send_to', '').strip()
         self.filter_str = config.get('filter_str', '').strip()
+        self.roles_to_filter = config.get(
+            'roles_to_filter', '').strip().split(',')
 
     def _get_nfp_roles(self, uid):
         out = []
@@ -191,9 +193,11 @@ class Expander(object):
         except (ldap.NO_SUCH_OBJECT, ValueError):
             log.info("%r role not found in ldap", role)
             return RETURN_CODES['EX_NOUSER']
-        except:
-            log.error("%r role not found exception", role)
+        except Exception, e:
+            log.error("%r role not found exception, %r" % (role, e))
             return RETURN_CODES['EX_NOUSER']
+
+        top_role = role.split('-')[0]
 
         if send_to_owners is True:  # Send e-mail to owners
             owners = role_data['owners_data']
@@ -258,7 +262,8 @@ class Expander(object):
             # if there is a filter and the mail was not sent directly to
             # a role matching the filter, remove all users from subroles
             # mathching that filter
-            if self.filter_str not in role:
+            if (top_role in self.roles_to_filter and
+                    self.filter_str not in role):
                 filter_out = False
                 member_roles = self.agent.roles_with_member(dn)
                 for member_role in member_roles:
@@ -327,10 +332,11 @@ class Expander(object):
                         for owner_dn in role_info['owner']:
                             try:
                                 owner = self.agent._query(owner_dn)
-                            except:
+                            except Exception, e:
                                 # Log that we couldn't get the email.
                                 log.exception(
-                                    "Invalid `owner` DN: %s", owner_dn)
+                                    "Invalid `owner` DN: %s; %s" % (owner_dn,
+                                                                    e))
                                 continue
 
                             senders.update([x.lower() for x in owner['mail']])
@@ -345,9 +351,9 @@ class Expander(object):
             for person_dn in role_info.get('permittedPerson', []):
                 try:
                     email = self.agent._query(person_dn)['mail'][0]
-                except:
+                except Exception, e:
                     # Log that we couldn't get the email.
-                    log.exception("Invalid DN: %s", person_dn)
+                    log.exception("Invalid DN: %s; %s" (person_dn, e))
                     continue
                 else:
                     senders.add(email)
@@ -383,6 +389,7 @@ class Expander(object):
         role email. (Ticket http://taskman.eionet.europa.eu/issues/22529)
         """
 
+        return True
         role_data = self.add_inherited_senders(role_id=role,
                                                role_data=role_data)
 
@@ -407,10 +414,10 @@ class Expander(object):
                         for owner_dn in role_data['owner']:
                             try:
                                 owner = self.agent._query(owner_dn)
-                            except:
+                            except Exception, e:
                                 # Log that we couldn't get the email.
                                 log.exception(
-                                    "Invalid `owner` DN: %s", owner_dn)
+                                    "Invalid `owner` DN: %s; %s" (owner_dn, e))
                                 continue
                             if from_email in map(str.lower, owner['mail']):
                                 return True
@@ -430,9 +437,9 @@ class Expander(object):
                     persons_emails = self.agent._query(permitted_dn)['mail']
                     if from_email in map(str.lower, persons_emails):
                         return True
-                except:
+                except Exception, e:
                     # Log that we couldn't get the email.
-                    log.exception("Invalid DN: %s", permitted_dn)
+                    log.exception("Invalid DN: %s; %s" % (permitted_dn, e))
                     continue
 
         if role.startswith('eionet-nrc'):
@@ -514,13 +521,13 @@ class Expander(object):
                 log.error("Failed to send confirmation email "
                           "using smtplib to %s", to_email)
                 return RETURN_CODES['EX_PROTOCOL']
-            except:
-                log.exception("Unknown smtplib error")
+            except Exception, e:
+                log.exception("Smtplib error %s", e)
                 return RETURN_CODES['EX_UNAVAILABLE']
         finally:
             try:
                 smtp.quit()
-            except:
+            except Exception:
                 pass
 
         return RETURN_CODES['EX_OK']
@@ -575,13 +582,13 @@ class Expander(object):
                     log.error(
                         "Failed to send emails using smtplib to %r", emails)
                     return RETURN_CODES['EX_PROTOCOL']
-                except:
-                    log.exception("Unknown smtplib error")
+                except Exception, e:
+                    log.exception("Smtplib error %s" % e)
                     return RETURN_CODES['EX_UNAVAILABLE']
             finally:
                 try:
                     smtp.quit()
-                except:
+                except Exception:
                     pass
             return RETURN_CODES['EX_OK']
 
@@ -600,9 +607,9 @@ class Expander(object):
             # if we get an EAGAIN or EACCES error
             # except IOError, e:
             #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
-        except:
-            log.error("Unable to acquire exclusive lock on %s" %
-                      self.archivefile)
+        except Exception, e:
+            log.error("Unable to acquire exclusive lock on %s; e" %
+                      (self.archivefile, e))
             return
         mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
         mboxfd.write(content)
@@ -688,14 +695,15 @@ def main():
         # Open connection with the ldap
         try:
             agent = LdapAgent(**ldap_config)
-        except:
-            log.error("Cannot connect to LDAP %s", ldap_config['ldap_server'])
+        except Exception, e:
+            log.error("Cannot connect to LDAP %s; %s" % (
+                ldap_config['ldap_server'], e))
             return RETURN_CODES['EX_TEMPFAIL']
 
         expander = Expander(agent, **expander_config)
         return expander.expand(from_email, role_email, content, debug_mode)
-    except:
-        log.exception("Unexpected error")
+    except Exception, e:
+        log.exception("e")
         return RETURN_CODES['EX_SOFTWARE']
 
 

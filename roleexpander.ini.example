@@ -13,6 +13,8 @@ no_owner_send_to: someone@example.com
 
 # roles containing this string will be skipped if not sent to directly
 filter_str: -gb
+# only apply the filter to roles stating with:
+roles_to_filter: eea,eionet
 
 [ldap]
 ldap_server: ldaps://ldap.eionet.europa.eu:636
