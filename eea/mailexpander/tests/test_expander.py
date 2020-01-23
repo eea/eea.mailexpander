@@ -31,7 +31,8 @@ class ExpanderTest(unittest.TestCase):
         self.agent = StubbedLdapAgent(ldap_server='', user_dn='', user_pw='')
         self.mock_conn = self.agent.conn
 
-        self.expander = Expander(self.agent)
+        self.expander = Expander(self.agent, roles_to_filter='test',
+                                 filter_str='-gb')
         self.expander.send_emails = Mock(return_value=RETURN_CODES['EX_OK'])
 
         # Load fixtures from ./fixtures directory into dictionary with keys as
@@ -54,11 +55,30 @@ class ExpanderTest(unittest.TestCase):
         self.ldap_data = [
             (role_dn('test'), ldap.SCOPE_BASE, [
                 [role_dn('test'), {
-                    'uniqueMember': [user_dn('userone'), user_dn('usertwo')],
+                    'uniqueMember': [user_dn('userone'), user_dn('usertwo'),
+                                     user_dn('user3'), user_dn('user4')],
                     'permittedPerson': [user_dn('user4')],
                     'permittedSender': ['test@email.com',
                                         '*@email.com', 'members', 'owners'],
                     'owner': [user_dn('user3')]
+                }],
+            ]),
+            (role_dn('test-gb'), ldap.SCOPE_BASE, [
+                [role_dn('test-gb'), {
+                    'uniqueMember': [user_dn('user3')],
+                    'permittedPerson': [user_dn('user4')],
+                    'permittedSender': ['test@email.com',
+                                        '*@email.com', 'members', 'owners'],
+                    'owner': [user_dn('user3')]
+                }],
+            ]),
+            (role_dn('test-ro'), ldap.SCOPE_BASE, [
+                [role_dn('test-ro'), {
+                    'uniqueMember': [user_dn('user4')],
+                    'permittedPerson': [user_dn('user4')],
+                    'permittedSender': ['test@email.com',
+                                        '*@email.com', 'members', 'owners'],
+                    'owner': [user_dn('user4')]
                 }],
             ]),
             (role_dn('unowned'), ldap.SCOPE_BASE, [
@@ -256,6 +276,45 @@ class ExpanderTest(unittest.TestCase):
         self.assertEquals(self.expander.send_emails.call_args[0][1], [
             'user_three@example.com', 'user_3333@example.com'])
 
+    def test_send_filtered(self):
+        from_email = 'user_one@example.com'
+        role_email = 'test@roles.eionet.europa.eu'
+
+        self.expander.roles_to_filter = []
+        self.expander.filter_str = ''
+        self.expander.expand(from_email, role_email,
+                             self.fixtures['content_7bit'])
+        self.assertEquals(self.expander.send_emails.call_args[0][1], [
+            'user_four@example.com', 'user_three@example.com',
+            'user_3333@example.com', 'user_two@example.com',
+            'user_one@example.com'])
+
+        self.expander.roles_to_filter = []
+        self.expander.filter_str = '-gb'
+        self.expander.expand(from_email, role_email,
+                             self.fixtures['content_7bit'])
+        self.assertEquals(self.expander.send_emails.call_args[0][1], [
+            'user_four@example.com', 'user_three@example.com',
+            'user_3333@example.com', 'user_two@example.com',
+            'user_one@example.com'])
+
+        self.expander.roles_to_filter = ['test']
+        self.expander.filter_str = ''
+        self.expander.expand(from_email, role_email,
+                             self.fixtures['content_7bit'])
+        self.assertEquals(self.expander.send_emails.call_args[0][1], [
+            'user_four@example.com', 'user_three@example.com',
+            'user_3333@example.com', 'user_two@example.com',
+            'user_one@example.com'])
+
+        self.expander.roles_to_filter = ['test']
+        self.expander.filter_str = '-gb'
+        self.expander.expand(from_email, role_email,
+                             self.fixtures['content_7bit'])
+        self.assertEquals(self.expander.send_emails.call_args[0][1], [
+            'user_four@example.com', 'user_two@example.com',
+            'user_one@example.com'])
+
     def test_send_to_fallback_owner(self):
         from_email = 'user_one@example.com'
         role_email = 'owner-unowned@roles.eionet.europa.eu'
@@ -289,7 +348,10 @@ class ExpanderTest(unittest.TestCase):
         """
         def send_emails_called(from_email, emails, content):
             """ Content is modified but this is not the subject of this test"""
-            assert emails == ['user_two@example.com', 'user_one@example.com']
+            assert emails == [
+                'user_four@example.com', 'user_three@example.com',
+                'user_3333@example.com', 'user_two@example.com',
+                'user_one@example.com']
             return RETURN_CODES['EX_OK']
 
         self.expander.send_emails.side_effect = send_emails_called
@@ -402,7 +464,7 @@ class ExpanderTest(unittest.TestCase):
         self.assertEqual(return_code, RETURN_CODES['EX_NOUSER'])
 
     def test_batch(self):
-        """ Test sending batch e-mails. Generate 60 ldap users and expect
+        """ Test sending batch e-mails. Generate 120 ldap users and expect
         batches of 50 e-mails
 
         """
@@ -444,7 +506,10 @@ class ExpanderTest(unittest.TestCase):
         self.expander.expand('user_one@example.com',
                              'test@roles.eionet.europa.eu',
                              self.fixtures['content_7bit'])
-        self.assertEqual(total_mails, 120)
+        # we should have 4 users initially in test, of which user3
+        # has two emails + 118 users added in this method;
+        # 3 x 1 + 1 * 2 + 118 = 123
+        self.assertEqual(total_mails, 123)
 
     def test_empty_role(self):
         """ Test invalid role scenarios (missing members,

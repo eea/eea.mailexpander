@@ -18,7 +18,7 @@ class StubbedLdapAgent(ldap_agent.LdapAgent):
 
 class LdapAgentTest(unittest.TestCase):
     def setUp(self):
-        self.agent = StubbedLdapAgent(ldap_server='')
+        self.agent = StubbedLdapAgent(ldap_server='', user_dn='', user_pw='')
         self.mock_conn = self.agent.conn
 
     def test_get_role(self):

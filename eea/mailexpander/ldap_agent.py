@@ -116,7 +116,7 @@ class LdapAgent(object):
                         continue  # Ignore empty DN attributes
                     try:
                         return_attr[dn] = self._query(dn)
-                    except:
+                    except Exception:
                         pass  # Ignore members that don't exist in ldap anymore
             return {target_attr: return_attr}
 

@@ -121,8 +121,11 @@ class Expander(object):
         self.noreply = config.get('no_reply', 'no-reply@eea.europa.eu')
         self.no_owner_send_to = config.get('no_owner_send_to', '').strip()
         self.filter_str = config.get('filter_str', '').strip()
-        self.roles_to_filter = config.get(
-            'roles_to_filter', '').strip().split(',')
+        self.roles_to_filter = []
+        roles_to_filter = config.get(
+            'roles_to_filter', '')
+        if roles_to_filter:
+            self.roles_to_filter = roles_to_filter.strip().split(',')
 
     def _get_nfp_roles(self, uid):
         out = []
@@ -267,7 +270,11 @@ class Expander(object):
                 filter_out = False
                 member_roles = self.agent.roles_with_member(dn)
                 for member_role in member_roles:
-                    if self.filter_str in member_role:
+                    # we remove only users who are members of a
+                    # subbranch of the current top_role that contains
+                    # the filtered string
+                    if (top_role in member_role and
+                            self.filter_str in member_role):
                         log.info('filtered out %s' % dn)
                         filter_out = True
                         break
@@ -389,7 +396,6 @@ class Expander(object):
         role email. (Ticket http://taskman.eionet.europa.eu/issues/22529)
         """
 
-        return True
         role_data = self.add_inherited_senders(role_id=role,
                                                role_data=role_data)
 
