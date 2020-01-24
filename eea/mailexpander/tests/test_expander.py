@@ -29,10 +29,10 @@ class ExpanderTest(unittest.TestCase):
 
     def setUp(self):
         self.agent = StubbedLdapAgent(ldap_server='', user_dn='', user_pw='')
+        self.agent.roles_with_member = Mock(return_value=[])
         self.mock_conn = self.agent.conn
 
-        self.expander = Expander(self.agent, roles_to_filter='test',
-                                 filter_str='-gb')
+        self.expander = Expander(self.agent)
         self.expander.send_emails = Mock(return_value=RETURN_CODES['EX_OK'])
 
         # Load fixtures from ./fixtures directory into dictionary with keys as
@@ -55,6 +55,7 @@ class ExpanderTest(unittest.TestCase):
         self.ldap_data = [
             (role_dn('test'), ldap.SCOPE_BASE, [
                 [role_dn('test'), {
+                    'objectClass': ['groupOfUniqueNames'],
                     'uniqueMember': [user_dn('userone'), user_dn('usertwo'),
                                      user_dn('user3'), user_dn('user4')],
                     'permittedPerson': [user_dn('user4')],
@@ -65,6 +66,7 @@ class ExpanderTest(unittest.TestCase):
             ]),
             (role_dn('test-gb'), ldap.SCOPE_BASE, [
                 [role_dn('test-gb'), {
+                    'objectClass': ['groupOfUniqueNames'],
                     'uniqueMember': [user_dn('user3')],
                     'permittedPerson': [user_dn('user4')],
                     'permittedSender': ['test@email.com',
@@ -74,6 +76,7 @@ class ExpanderTest(unittest.TestCase):
             ]),
             (role_dn('test-ro'), ldap.SCOPE_BASE, [
                 [role_dn('test-ro'), {
+                    'objectClass': ['groupOfUniqueNames'],
                     'uniqueMember': [user_dn('user4')],
                     'permittedPerson': [user_dn('user4')],
                     'permittedSender': ['test@email.com',
@@ -83,6 +86,7 @@ class ExpanderTest(unittest.TestCase):
             ]),
             (role_dn('unowned'), ldap.SCOPE_BASE, [
                 [role_dn('unowned'), {
+                    'objectClass': ['groupOfUniqueNames'],
                     'uniqueMember': [user_dn('userone'), user_dn('usertwo')],
                     'permittedPerson': [user_dn('user4')],
                     'permittedSender': ['test@email.com',
@@ -128,6 +132,20 @@ class ExpanderTest(unittest.TestCase):
             return ldap_search(dn, scope, self.ldap_data, **kwargs)
 
         self.mock_conn.search_s.side_effect = ldap_search_called
+
+        self.agent.roles_with_member.side_effect = self.roles_with_member
+
+    def roles_with_member(self, dn):
+        """ """
+        result = []
+        for l_dn, scope, l_data in self.ldap_data:
+            if 'groupOfUniqueNames' in l_data[0][1].get('objectClass', []):
+                if dn in l_data[0][1].get('uniqueMember', []):
+                    result.append(l_dn)
+        if result:
+            return [item.split(',')[0][3:] for item in result]
+        else:
+            return []
 
     def test_error_codes_in_agent(self):
         no_user = RETURN_CODES['EX_NOUSER']
@@ -277,8 +295,10 @@ class ExpanderTest(unittest.TestCase):
             'user_three@example.com', 'user_3333@example.com'])
 
     def test_send_filtered(self):
-        from_email = 'user_one@example.com'
+
+        from_email = 'test@email.com'
         role_email = 'test@roles.eionet.europa.eu'
+        role_email_gb = 'test-gb@roles.eionet.europa.eu'
 
         self.expander.roles_to_filter = []
         self.expander.filter_str = ''
@@ -314,6 +334,13 @@ class ExpanderTest(unittest.TestCase):
         self.assertEquals(self.expander.send_emails.call_args[0][1], [
             'user_four@example.com', 'user_two@example.com',
             'user_one@example.com'])
+
+        self.expander.roles_to_filter = ['test']
+        self.expander.filter_str = '-gb'
+        self.expander.expand(from_email, role_email_gb,
+                             self.fixtures['content_7bit'])
+        self.assertEquals(self.expander.send_emails.call_args[0][1], [
+            'user_three@example.com', 'user_3333@example.com'])
 
     def test_send_to_fallback_owner(self):
         from_email = 'user_one@example.com'

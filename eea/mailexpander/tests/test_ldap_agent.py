@@ -15,7 +15,6 @@ class StubbedLdapAgent(ldap_agent.LdapAgent):
     def connect(self):
         return Mock()
 
-
 class LdapAgentTest(unittest.TestCase):
     def setUp(self):
         self.agent = StubbedLdapAgent(ldap_server='', user_dn='', user_pw='')
