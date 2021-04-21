@@ -25,7 +25,7 @@ __version__ = """$Id: expander.py 40888 2017-04-05 09:47:09Z tiberich $"""
 try:
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-except ImportError as e:      # pragma: no cover
+except ImportError:      # pragma: no cover
     from email.MIMEText import MIMEText
     from email.MIMEMultipart import MIMEMultipart
 
@@ -196,7 +196,7 @@ class Expander(object):
         except (ldap.NO_SUCH_OBJECT, ValueError):
             log.info("%r role not found in ldap", role)
             return RETURN_CODES['EX_NOUSER']
-        except Exception, e:
+        except Exception as e:
             log.error("%r role not found exception, %r" % (role, e))
             return RETURN_CODES['EX_NOUSER']
 
@@ -208,6 +208,10 @@ class Expander(object):
                 retval = self.send_emails(from_email, owner_data['mail'],
                                           content)
                 if retval != RETURN_CODES['EX_OK']:
+                    log.exception(
+                        "Error sending to owners: code %s, from_email %s, "
+                        "owner email(s) %s, content %s",
+                        retval, from_email, owner_data['mail'], content)
                     return retval
             if not owners:
                 log.info("No owner found, sending to %s",
@@ -217,6 +221,11 @@ class Expander(object):
                         retval = self.send_emails(
                             from_email, [self.no_owner_send_to], content)
                         if retval != RETURN_CODES['EX_OK']:
+                            log.exception(
+                                "Error sending to default owner: code %s, "
+                                "from_email %s, owner email(s) %s, content %s",
+                                retval, from_email, self.no_owner_send_to,
+                                content)
                             return retval
                     else:
                         return RETURN_CODES['EX_CONFIG']
@@ -292,14 +301,23 @@ class Expander(object):
 
             # If there are any addresses to always send to
             if self.also_send_to != ['']:
-                retval = self.send_emails(
+                also_retval = self.send_emails(
                     'owner-' + role_email, self.also_send_to, content)
+                if also_retval != RETURN_CODES['EX_OK']:
+                    log.exception(
+                        "Error sending to also_emails: code %s, role_email %s,"
+                        " emails %s, content %s",
+                        also_retval, role_email, self.also_send_to, content)
 
             # Send e-mails
             for emails in email_batches:
                 retval = self.send_emails(
                     'owner-' + role_email, emails, content)
                 if retval != RETURN_CODES['EX_OK']:
+                    log.exception(
+                        "Error sending email: code %s, role_email %s, "
+                        "emails %s, content %s",
+                        retval, role_email, emails, content)
                     return retval
             try:
                 retval = self.send_confirmation_email(
@@ -308,7 +326,10 @@ class Expander(object):
                 log.exception("Error sending confirmation")
             else:
                 if retval != RETURN_CODES['EX_OK']:
-                    log.error("Error sending confirmation: %d", retval)
+                    log.error(
+                        "Error sending confirmation: code %d, subject %s, "
+                        "from_email %s, role %s",
+                        retval, subject, from_email, role)
 
         return RETURN_CODES['EX_OK']
 
@@ -339,7 +360,7 @@ class Expander(object):
                         for owner_dn in role_info['owner']:
                             try:
                                 owner = self.agent._query(owner_dn)
-                            except Exception, e:
+                            except Exception as e:
                                 # Log that we couldn't get the email.
                                 log.exception(
                                     "Invalid `owner` DN: %s; %s" % (owner_dn,
@@ -358,7 +379,7 @@ class Expander(object):
             for person_dn in role_info.get('permittedPerson', []):
                 try:
                     email = self.agent._query(person_dn)['mail'][0]
-                except Exception, e:
+                except Exception as e:
                     # Log that we couldn't get the email.
                     log.exception("Invalid DN: %s; %s" (person_dn, e))
                     continue
@@ -420,7 +441,7 @@ class Expander(object):
                         for owner_dn in role_data['owner']:
                             try:
                                 owner = self.agent._query(owner_dn)
-                            except Exception, e:
+                            except Exception as e:
                                 # Log that we couldn't get the email.
                                 log.exception(
                                     "Invalid `owner` DN: %s; %s" (owner_dn, e))
@@ -443,7 +464,7 @@ class Expander(object):
                     persons_emails = self.agent._query(permitted_dn)['mail']
                     if from_email in map(str.lower, persons_emails):
                         return True
-                except Exception, e:
+                except Exception as e:
                     # Log that we couldn't get the email.
                     log.exception("Invalid DN: %s; %s" % (permitted_dn, e))
                     continue
@@ -527,7 +548,7 @@ class Expander(object):
                 log.error("Failed to send confirmation email "
                           "using smtplib to %s", to_email)
                 return RETURN_CODES['EX_PROTOCOL']
-            except Exception, e:
+            except Exception as e:
                 log.exception("Smtplib error %s", e)
                 return RETURN_CODES['EX_UNAVAILABLE']
         finally:
@@ -588,7 +609,7 @@ class Expander(object):
                     log.error(
                         "Failed to send emails using smtplib to %r", emails)
                     return RETURN_CODES['EX_PROTOCOL']
-                except Exception, e:
+                except Exception as e:
                     log.exception("Smtplib error %s" % e)
                     return RETURN_CODES['EX_UNAVAILABLE']
             finally:
@@ -613,9 +634,9 @@ class Expander(object):
             # if we get an EAGAIN or EACCES error
             # except IOError, e:
             #     if e.errno in (errno.EAGAIN, errno.EACCES): ...
-        except Exception, e:
-            log.error("Unable to acquire exclusive lock on %s; e" %
-                      (self.archivefile, e))
+        except Exception as e:
+            log.error("Unable to acquire exclusive lock on %s; e: %s",
+                      self.archivefile, e)
             return
         mboxfd.write('From ' + from_email + '  ' + time.asctime() + '\n')
         mboxfd.write(content)
@@ -626,8 +647,8 @@ class Expander(object):
 
 
 def usage():
-    print ("%s [-t] -r [to-email] -f [from-email] -c [config-file] "
-           "-l [ldap-host] -o [logfile]") % sys.argv[0]
+    print("%s [-t] -r [to-email] -f [from-email] -c [config-file] "
+          "-l [ldap-host] -o [logfile]") % sys.argv[0]
     # You can't log when you have just removed the log handler
     # log.error("Invalid arguments %r" % sys.argv)
     sys.exit(RETURN_CODES['EX_USAGE'])
@@ -701,15 +722,15 @@ def main():
         # Open connection with the ldap
         try:
             agent = LdapAgent(**ldap_config)
-        except Exception, e:
+        except Exception as e:
             log.error("Cannot connect to LDAP %s; %s" % (
                 ldap_config['ldap_server'], e))
             return RETURN_CODES['EX_TEMPFAIL']
 
         expander = Expander(agent, **expander_config)
         return expander.expand(from_email, role_email, content, debug_mode)
-    except Exception, e:
-        log.exception("e")
+    except Exception as e:
+        log.exception(e)
         return RETURN_CODES['EX_SOFTWARE']
 
 
