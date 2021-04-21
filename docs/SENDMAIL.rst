@@ -1,6 +1,10 @@
 eea.mailexpander sendmail configuration
 =======================================
 
+To be updated
+-------------
+https://serverfault.com/questions/258469/how-to-configure-postfix-to-pipe-all-incoming-email-to-a-script#answer-258491
+
 This is a guide on how to configure the sendmail server to use this mailer.
 
 1. Install the program
