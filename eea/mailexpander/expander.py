@@ -420,17 +420,6 @@ class Expander(object):
         role_data = self.add_inherited_senders(role_id=role,
                                                role_data=role_data)
 
-        # Convert to lower in case of mixed-case e-mail addresses
-        from_email = from_email.lower()
-
-        # Fix for #18085;
-        # Treat the case where the email address contains the = character.
-        # the eionet accounts only use "clean" emails
-        # assume a single @ inside email address
-        ident, host = from_email.split('@')
-        name = ident.split('=')[-1]
-        from_email = "@".join((name, host))
-
         if 'permittedSender' in role_data:
             if 'anyone' in role_data['permittedSender']:
                 return True
@@ -670,6 +659,15 @@ def main():
     try:
         opts = dict(opts)
         from_email = opts['-f']
+        # Convert to lower in case of mixed-case e-mail addresses
+        from_email = from_email.lower()
+
+        # Treat the case where the email address contains the = character.
+        # the eionet accounts only use "clean" emails
+        # assume a single @ inside email address
+        ident, host = from_email.split('@')
+        name = ident.split('=')[-1]
+        from_email = "@".join((name, host))
         role_email = opts['-r']
         if '-c' in opts:
             config = ConfigParser()
