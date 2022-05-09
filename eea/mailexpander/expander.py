@@ -345,7 +345,7 @@ class Expander(object):
 
         role_dn = self.agent._role_dn(role_id)
         parent_roles = self.agent._ancestor_roles_dn(role_dn)[1:]
-        senders = set(role_data['permittedSender'])
+        senders = set(role_data.get('permittedSender', []))
 
         for parent_role_dn in parent_roles:
             role_info = self.agent._role_info(parent_role_dn)
