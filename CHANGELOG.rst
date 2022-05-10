@@ -1,5 +1,6 @@
 0.16 (unreleased)
 ======================
+* fix crashing when no permittedSenders are set [dumitval]
 * allow filtering of role members for specified top roles [dumitval]
 
 0.15 (2018-04-23)
