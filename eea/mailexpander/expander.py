@@ -378,13 +378,13 @@ class Expander(object):
 
             for person_dn in role_info.get('permittedPerson', []):
                 try:
-                    email = self.agent._query(person_dn)['mail'][0]
+                    sender_email = self.agent._query(person_dn)['mail'][0]
                 except Exception as e:
                     # Log that we couldn't get the email.
-                    log.exception("Invalid DN: %s; %s" (person_dn, e))
+                    log.exception("Invalid DN: %s; %s" % (person_dn, e))
                     continue
                 else:
-                    senders.add(email)
+                    senders.add(sender_email)
 
         role_data['permittedSender'] = filter(None, set(senders))
 
@@ -433,7 +433,7 @@ class Expander(object):
                             except Exception as e:
                                 # Log that we couldn't get the email.
                                 log.exception(
-                                    "Invalid `owner` DN: %s; %s" (owner_dn, e))
+                                    "Invalid `owner` DN: %s; %s" % (owner_dn, e))
                                 continue
                             if from_email in map(str.lower, owner['mail']):
                                 return True
@@ -486,7 +486,7 @@ class Expander(object):
     def _country_for_role(self, role):
         try:
             _, _, _, _, country = role.split('-')
-        except IndexError:
+        except ValueError:
             return None
         return country
 

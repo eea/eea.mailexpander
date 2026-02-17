@@ -1,5 +1,8 @@
 0.16 (unreleased)
 ======================
+* Bugfix: syntax fixes in log.exception [dumitval]
+* Bugfix: correct exception handling in _country_for_role [dumitval]
+* Bugfix: fix shadowing imported email [dumitval]
 * fix crashing when no permittedSenders are set [dumitval]
 * allow filtering of role members for specified top roles [dumitval]
 
