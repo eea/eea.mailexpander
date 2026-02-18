@@ -1,5 +1,6 @@
 0.16 (unreleased)
 ======================
+* Bugfix: add exception handling for invalid passed email addresses [dumitval]
 * Bugfix: syntax fixes in log.exception [dumitval]
 * Bugfix: correct exception handling in _country_for_role [dumitval]
 * Bugfix: fix shadowing imported email [dumitval]

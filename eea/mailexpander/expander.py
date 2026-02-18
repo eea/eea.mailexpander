@@ -684,6 +684,9 @@ def main():
 
     except KeyError:
         usage()
+    except ValueError:
+        log.error("Invalid email address (no '@' sign): %s", from_email)
+        return RETURN_CODES['EX_DATAERR']
 
     if debug_mode:
         log.setLevel(logging.DEBUG)
